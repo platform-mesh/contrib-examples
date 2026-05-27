@@ -12,10 +12,11 @@
 # The kindest/node images are multi-arch manifest lists; Docker Desktop on macOS arm64 will
 # automatically pull the arm64 variant.
 #
-# Docker Desktop note: no extra networking config is needed. Docker Desktop injects
-# `host.docker.internal` into every container, so pods running here can reach the host — where
-# cluster A's kcp front-proxy is published (host 127.0.0.1:8443) — via that hostname out of the
-# box. See the hostAliases fallback in config/syncagent/values.yaml if DNS resolution fails.
+# Connectivity to cluster A: the api-syncagent reaches cluster A's kcp gateway (published on the
+# host at 127.0.0.1:8443) under the SNI hostname root.kcp.localhost. Inside the pod that name is
+# resolved via the agent's hostAliases (config/syncagent/values.yaml) to the shared `kind` network's
+# host-gateway, which forwards to the host's published :8443. No per-cluster network config is
+# needed here beyond sharing the default `kind` network with cluster A.
 apiVersion: kind.x-k8s.io/v1alpha4
 kind: Cluster
 name: msp-postgres-backing

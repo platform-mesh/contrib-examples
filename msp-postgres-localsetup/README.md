@@ -10,7 +10,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the Mermaid flow.
 
 > **Status:** this directory (Workstream B) provides the backing-cluster bring-up. The control-plane
 > side (the `postgresql.cnpg.io` APIExport, portal registration, account `APIBinding`, and the
-> kcp `host.docker.internal` reachability change) lives on the `feat/msp-postgres-localsetup` branch
+> kcp `root.kcp.localhost` reachability change) lives on the `feat/msp-postgres-localsetup` branch
 > of the **helm-charts** repo (Workstream A). The end-to-end live runbook is finalised by the
 > integrator.
 
@@ -29,25 +29,29 @@ macOS host / Docker Desktop
 │  • portal + Keycloak                  │◄─────│  • api-syncagent v0.6.0 ── dials out ─┤
 │  • ws root:providers:postgres-provider│ :8443│  • Postgres 15 pods + PVCs + Secret   │
 │    APIExport postgresql.cnpg.io       │      │                                       │
-│  • account ws: APIBinding + ordered   │      │  reaches A via host.docker.internal   │
+│  • account ws: APIBinding + ordered   │      │  reaches A via root.kcp.localhost     │
 │    Cluster + synced status/Secret     │      │                                       │
 └──────────────────────────────────────┘      └──────────────────────────────────────┘
 ```
 
 Both kind clusters sit on the default `kind` Docker network. The agent in B reaches A's kcp over
-**two hops**, both via `host.docker.internal:8443` (Docker Desktop injects that hostname into
-containers): the bootstrap kubeconfig server, and the `APIExportEndpointSlice` virtual-workspace URL
-that A's kcp advertises.
+**two hops**, both via `root.kcp.localhost:8443`: the bootstrap kubeconfig server, and the
+`APIExportEndpointSlice` virtual-workspace URL that A's kcp advertises. The hostname **must** be
+`root.kcp.localhost` — cluster A fronts kcp with an Istio gateway that routes by SNI, and only that
+name has a TLSRoute. Since `root.kcp.localhost` would otherwise resolve to `127.0.0.1` inside a pod,
+the agent's `hostAliases` (in `config/syncagent/values.yaml`) maps it to the shared `kind` network's
+host-gateway, which forwards to the host's published `:8443`.
 
 ---
 
 ## Integration contract (must match Workstream A)
 
-- **APIExport name `postgresql.cnpg.io`** — set in `config/syncagent/values.yaml`
-  (`apiExportName` + `apiExportEndpointSliceName`). It MUST equal the APIExport that provider-portal
-  creates in cluster A's provider workspace. (The standalone `msp-postgres` example uses the name
-  `api-syncagent`; APIExport names are arbitrary in kcp, so driving one named `postgresql.cnpg.io`
-  in passthrough mode works identically.)
+- **APIExport name `postgresql.cnpg.io`** — set in `config/syncagent/values.yaml`.
+  `apiExportEndpointSliceName` is the functional knob (renders `--apiexportendpointslice-ref`);
+  `apiExportName` documents intent but is inert in the v0.6.0 chart. It MUST equal the APIExport
+  provider-portal creates in cluster A's provider workspace, so kcp's auto-created default
+  `APIExportEndpointSlice` carries the same name (that is what the agent follows). (Names are
+  arbitrary in kcp; passthrough works identically — the standalone `msp-postgres` uses `api-syncagent`.)
 - **Account `APIBinding` must `Accept` all three auto-added permissionClaims** — `namespaces`,
   `secrets`, `events` — or the connection Secret never syncs back (silent-failure trap). That
   binding is owned by Workstream A (auto-added to every account via `extraDefaultAPIBindings`).
@@ -58,8 +62,8 @@ that A's kcp advertises.
 
 | Tool | Notes |
 |------|-------|
-| Cluster A up | The Platform Mesh local-setup on the `feat/msp-postgres-localsetup` branch, with the postgres-provider example-data applied and kcp advertising `host.docker.internal` |
-| `docker` | Docker Desktop (macOS) — provides `host.docker.internal` |
+| Cluster A up | The Platform Mesh local-setup on the `feat/msp-postgres-localsetup` branch, with the postgres-provider example-data applied and kcp reachable as `root.kcp.localhost:8443` |
+| `docker` | Docker Desktop (macOS) — the shared `kind` network's host-gateway forwards to the host's published `:8443` (used by the agent's `hostAliases`) |
 | `kind` | Any recent release |
 | `kubectl` + `kubectl-ws` | The kcp plugin (`kubectl ws`); local-setup installs it |
 | `helm` | v3 |
@@ -138,7 +142,7 @@ There are **no `kcp:*` targets** — kcp is cluster A's, not a host process.
 | `CONSUMER_WS` | `root:orgs:REPLACE-WITH-ACCOUNT` | **Placeholder** — set to the real account workspace in cluster A |
 | `ORDER_NAME` | `pg-demo` | Ordered `Cluster` name |
 | `ORDER_NS` | `default` | Ordered `Cluster` namespace |
-| `KCP_EXTERNAL_HOST` | `host.docker.internal` | Cluster A's kcp hostname reachable from inside the backing cluster |
+| `KCP_EXTERNAL_HOST` | `root.kcp.localhost` | Cluster A's kcp hostname (the only SNI its Istio gateway routes); resolved in-pod via `hostAliases` |
 | `KCP_PORT` | `8443` | Cluster A's front-proxy port |
 | `TASKFILE_DIR` | _(this directory)_ | Absolute path for building relative paths in scripts |
 
@@ -148,8 +152,12 @@ There are **no `kcp:*` targets** — kcp is cluster A's, not a host process.
 
 - **`syncagent:kubeconfig` errors that cluster A's kubeconfig is missing** — stand up cluster A on
   the branch first; `KCP_KUBECONFIG` must point at a real `admin.kubeconfig`.
-- **Agent logs `lookup host.docker.internal: no such host`** — enable the `hostAliases` fallback in
-  `config/syncagent/values.yaml` (map `host.docker.internal` → the `kind` network host-gateway).
+- **Agent can't reach kcp / `root.kcp.localhost` unresolvable or connection refused** — the
+  `hostAliases` block in `config/syncagent/values.yaml` is enabled with a placeholder IP
+  (`172.18.0.1`); verify/override it with the real `kind` network host-gateway:
+  `docker network inspect kind -f '{{ (index .IPAM.Config 0).Gateway }}'`.
+- **TLS/routing errors despite reachability** — confirm the agent connects as `root.kcp.localhost`
+  (SNI); any other name fails A's Istio SNI routing.
 - **`APIBinding` never reaches `Bound` / Secret never syncs back** — confirm all three
   permissionClaims are Accepted on the account binding (Workstream A).
 - **Inspect the agent:**

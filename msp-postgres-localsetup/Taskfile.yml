@@ -42,8 +42,12 @@ vars:
   CONSUMER_WS: 'root:orgs:REPLACE-WITH-ACCOUNT'
   ORDER_NAME: pg-demo
   ORDER_NS: default
-  # Cluster A's kcp reachability from inside backing-cluster pods (Docker Desktop injects this).
-  KCP_EXTERNAL_HOST: host.docker.internal
+  # Hostname the backing-cluster agent uses to reach cluster A's kcp. MUST be root.kcp.localhost:
+  # cluster A's Istio gateway routes by SNI and only root.kcp.localhost has a TLSRoute, and kcp
+  # advertises its APIExportEndpointSlice virtual-workspace URLs at root.kcp.localhost:8443 — so
+  # BOTH hops use this one name. The agent Pod resolves it via the hostAliases block in
+  # config/syncagent/values.yaml (it would otherwise resolve to 127.0.0.1 = the pod itself).
+  KCP_EXTERNAL_HOST: root.kcp.localhost
   KCP_PORT: "8443"
   # Cluster A's admin kubeconfig (minted by the local-setup start.sh). Absolute path; override if
   # your helm-charts checkout lives elsewhere.

@@ -19,7 +19,7 @@ connection `Secret` flow back up to the consumer. No custom operator (CNPG-nativ
 flowchart LR
   subgraph host["macOS host / Docker Desktop"]
     subgraph A["kind cluster A — local-setup (control plane)"]
-      kcp["kcp v0.31.0<br/>front-proxy → host 127.0.0.1:8443<br/>advertises host.docker.internal"]
+      kcp["kcp v0.31.0<br/>Istio gateway → host 127.0.0.1:8443<br/>advertises root.kcp.localhost (SNI-routed)"]
       subgraph prov["ws: root:providers:postgres-provider"]
         apiexport["APIExport: postgresql.cnpg.io<br/>+ APIResourceSchema (clusters.postgresql.cnpg.io)<br/>+ APIExportEndpointSlice (VW URL)"]
       end
@@ -29,7 +29,7 @@ flowchart LR
       end
     end
     subgraph B["kind cluster B — msp-postgres-backing (data plane)"]
-      agent["api-syncagent v0.6.0 (ns kcp-system)<br/>kubeconfig → host.docker.internal:8443"]
+      agent["api-syncagent v0.6.0 (ns kcp-system)<br/>kubeconfig → root.kcp.localhost:8443<br/>(hostAliases → kind gateway)"]
       pr["PublishedResource: Cluster + related Secret pg-demo-app"]
       cnpg["CloudNativePG v1.29.1 operator"]
       pg["Postgres 15 pods: pg-demo-1 …"]
@@ -51,12 +51,12 @@ flowchart LR
 
 Cluster A (helm-charts, Workstream A) is stood up first: the `postgresql.cnpg.io` APIExport in
 `root:providers:postgres-provider`, portal registration, the per-account `APIBinding`, and kcp
-advertising `host.docker.internal`. Then, in cluster B (this directory):
+reachable as `root.kcp.localhost:8443`. Then, in cluster B (this directory):
 
 1. **Create the backing kind cluster** `msp-postgres-backing` (shares the default `kind` Docker network with A).
 2. **Install CNPG** v1.29.1 into B.
 3. **Build the provider-workspace kubeconfig** from A's admin kubeconfig (server rewritten to
-   `https://host.docker.internal:8443/clusters/root:providers:postgres-provider`,
+   `https://root.kcp.localhost:8443/clusters/root:providers:postgres-provider`,
    `insecure-skip-tls-verify`), store it as a `Secret` in B (`kcp-system`).
 4. **Install api-syncagent** v0.6.0 (Helm) into B, pointed at the `postgresql.cnpg.io` APIExportEndpointSlice.
 5. **Publish** the CNPG `Cluster` API via a `PublishedResource` (+ on-cluster RBAC + related Secret).
@@ -77,12 +77,13 @@ proves the loop (pod Ready in B; status + Secret synced back to A; live `SELECT 
   single-consumer/single-order**; remove the `naming` block to restore the agent's default
   anti-collision hashing before any multi-consumer (goal 2) work.
 - **Connectivity** (the main risk): the agent in B reaches A's kcp over **two hops**, both via
-  `host.docker.internal:8443` — (1) the bootstrap kubeconfig server, (2) the
-  `APIExportEndpointSlice` virtual-workspace URL host that A advertises. Docker Desktop injects
-  `host.docker.internal` into containers; the agent uses `insecure-skip-tls-verify` for the bootstrap
-  connection. If DNS fails inside B, the `hostAliases` fallback in `values.yaml` maps the name to the
-  `kind` network host-gateway. The A-side reachability change (advertise `host.docker.internal`) is
-  owned by Workstream A.
+  `root.kcp.localhost:8443` — (1) the bootstrap kubeconfig server, (2) the `APIExportEndpointSlice`
+  virtual-workspace URL host that A advertises. The hostname **must** be `root.kcp.localhost`:
+  cluster A fronts kcp with an Istio gateway that routes by SNI and only that name has a TLSRoute
+  (`insecure-skip-tls-verify` still sends SNI from the URL host). Because `root.kcp.localhost` would
+  otherwise resolve to `127.0.0.1` inside a pod, the **required** `hostAliases` block in `values.yaml`
+  maps it to the shared `kind` network's host-gateway, which forwards to the host's published `:8443`.
+  The A-side reachability/SNI setup is owned by Workstream A.
 - **permissionClaims trap**: the account `APIBinding` must `Accept` all three auto-added claims —
   `namespaces`, `secrets`, `events` — or the connection Secret never syncs back (silent failure).
 - **Credentials**: CNPG generates `pg-demo-app`; it is synced back to the consumer workspace as a

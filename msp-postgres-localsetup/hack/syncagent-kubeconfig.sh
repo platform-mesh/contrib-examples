@@ -11,7 +11,8 @@
 #   3. Rewrites the server to https://$KCP_EXTERNAL_HOST:$KCP_PORT/<path> (path preserved) and sets
 #      insecure-skip-tls-verify: true (dropping the CA bundle) — this makes cluster A's kcp reachable,
 #      and TLS acceptable, from inside the backing kind network. Final server:
-#      https://host.docker.internal:8443/clusters/root:providers:postgres-provider
+#      https://root.kcp.localhost:8443/clusters/root:providers:postgres-provider
+#      ($KCP_EXTERNAL_HOST=root.kcp.localhost; see the SNI note below.)
 #   4. Stores it on the backing cluster as Secret `kcp-kubeconfig` (key `kubeconfig`) in ns kcp-system.
 #
 # Reads env vars exported by Taskfile.yml; do NOT hardcode paths/hosts/workspaces:
@@ -26,13 +27,15 @@
 #
 # !! CONNECTIVITY DEPENDENCY !!
 # This script only fixes hop #1 (the bootstrap kubeconfig the agent reads). The agent then follows
-# the APIExportEndpointSlice `postgresql.cnpg.io` virtual-workspace URL; THAT host is whatever
-# cluster A's kcp advertises. For the agent to reach it, cluster A's kcp MUST advertise
-# $KCP_EXTERNAL_HOST (host.docker.internal) for its front-proxy / virtual-workspace URLs (the A-side
-# change owned by the provider-portal/integrator workstream).
+# the APIExportEndpointSlice `postgresql.cnpg.io` virtual-workspace URL; cluster A's kcp advertises
+# that at $KCP_EXTERNAL_HOST:$KCP_PORT (root.kcp.localhost:8443) — the same name, so both hops use it.
+# root.kcp.localhost is mandatory because cluster A's Istio gateway routes by SNI and only that name
+# has a TLSRoute; insecure-skip-tls-verify still sends SNI from the URL host. The agent Pod resolves
+# root.kcp.localhost via the hostAliases block in config/syncagent/values.yaml (it would otherwise
+# resolve to 127.0.0.1 = the pod). The A-side advertise/SNI setup is owned by provider-portal/integrator.
 # Also: the admin kubeconfig at $KCP_KUBECONFIG must be reachable from THIS host (where `kubectl ws`
-# runs) — cluster A's front-proxy on 127.0.0.1:$KCP_PORT. The rewrite below swaps that host for the
-# kind-reachable one only in the agent's copy.
+# runs) — cluster A's gateway on 127.0.0.1:$KCP_PORT, where root.kcp.localhost resolves to loopback.
+# The rewrite below pins the agent's copy to root.kcp.localhost + insecure-skip-tls-verify.
 set -euo pipefail
 
 : "${KCP_KUBECONFIG:?KCP_KUBECONFIG must be set}"

@@ -7,17 +7,20 @@
 #   - ServiceAccount `kcp-api-syncagent`  (fullname == release name; matched by config/syncagent/rbac.yaml)
 #   - Deployment     `kcp-api-syncagent`
 #
-# HOW THE AGENT REACHES cluster A's kcp (two hops — BOTH must resolve/connect from inside the
-# kind pod in cluster B):
+# HOW THE AGENT REACHES cluster A's kcp (two hops — BOTH connect from inside the kind pod in
+# cluster B, and BOTH use the hostname root.kcp.localhost):
 #   1. Bootstrap: the agent reads Secret `kcp-kubeconfig` (key `kubeconfig`), built by
 #      hack/syncagent-kubeconfig.sh to point at the provider workspace
-#      (root:providers:postgres-provider) via https://host.docker.internal:8443 with
+#      (root:providers:postgres-provider) via https://root.kcp.localhost:8443 with
 #      insecure-skip-tls-verify.
 #   2. Serving: the agent then follows the APIExportEndpointSlice `postgresql.cnpg.io` in that
-#      workspace; the slice's virtual-workspace URL host is whatever cluster A's kcp advertises.
-#      That host MUST therefore also be host.docker.internal so the pod can reach it (the A-side
-#      kcp-reachability change is owned by the provider-portal/integrator workstream). See the
-#      hostAliases fallback at the bottom if the pod cannot resolve the name.
+#      workspace; cluster A's kcp advertises that virtual-workspace URL at root.kcp.localhost:8443.
+# WHY root.kcp.localhost (NOT host.docker.internal): cluster A fronts kcp with an Istio gateway
+# that routes by SNI, and only root.kcp.localhost has a TLSRoute — connecting under any other name
+# presents the wrong SNI and routing fails. insecure-skip-tls-verify still sends SNI derived from
+# the URL host, so the name in the kubeconfig server URL is what matters. Because root.kcp.localhost
+# would otherwise resolve to 127.0.0.1 (the pod itself), the hostAliases block below maps it to a
+# host-reachable gateway IP — that block is REQUIRED here, not just a fallback.
 
 # ==========================================================================================
 # INTEGRATION CONTRACT — these two names MUST equal the APIExport that provider-portal creates
@@ -63,14 +66,15 @@ image:
 crds:
   enabled: true
 
-# FALLBACK for cluster-B-pod -> cluster-A-kcp connectivity. The kind config
-# (config/kind/cluster.yaml) assumes Docker Desktop makes `host.docker.internal` resolvable from
-# kind pods. If that is NOT the case in a given CoreDNS setup, enable this and set ip to the kind
-# docker network's host-gateway (the host where cluster A's front-proxy :8443 is published):
+# REQUIRED for cluster-B-pod -> cluster-A-kcp connectivity (see "WHY root.kcp.localhost" above).
+# root.kcp.localhost — the only SNI cluster A's Istio gateway routes — would otherwise resolve to
+# 127.0.0.1 inside the pod. This maps it to the kind docker-network host-gateway, which forwards to
+# the host where cluster A's gateway :8443 is published. The IP below is a PLACEHOLDER (the common
+# Docker Desktop value); the integrator MUST verify/override it at live bring-up (#7):
 #   docker network inspect kind -f '{{ (index .IPAM.Config 0).Gateway }}'   # often 172.18.0.1
-# hostAliases:
-#   enabled: true
-#   values:
-#     - ip: "172.18.0.1"
-#       hostnames:
-#         - host.docker.internal
+hostAliases:
+  enabled: true
+  values:
+    - ip: "172.18.0.1"
+      hostnames:
+        - root.kcp.localhost
