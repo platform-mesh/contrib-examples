@@ -87,14 +87,19 @@ task syncagent:publish  # apply PublishedResource + RBAC; agent fills A's APIExp
 `task kind:up cnpg:install syncagent:kubeconfig syncagent:install syncagent:publish` runs them in
 one shot (each step is idempotent).
 
-Then order + verify against an **account workspace in cluster A** (set `CONSUMER_WS` to the real
-account path — the default is a placeholder that fails loudly):
+Then bind + order + verify against an **account workspace in cluster A** (set `CONSUMER_WS` to the
+real account path — the default is a placeholder that fails loudly):
 
 ```sh
+task bind   CONSUMER_WS=root:orgs:<org>:<account>   # accept all 3 permissionClaims (see below)
 task order  CONSUMER_WS=root:orgs:<org>:<account>
 task verify CONSUMER_WS=root:orgs:<org>:<account>
 task down   # delete the backing cluster (cluster A is left untouched)
 ```
+
+`task bind` is required because the operator's `extraDefaultAPIBindings` creates a **claim-less**
+auto-binding; it patches that binding (or applies `config/kcp/apibinding.yaml`) to Accept all three
+claims, otherwise the connection Secret silently never syncs back.
 
 Run `task` (no args) to list targets.
 
@@ -116,6 +121,7 @@ Run `task` (no args) to list targets.
 | `syncagent:kubeconfig` | `hack/syncagent-kubeconfig.sh` | syncagent-expert | ✅ | **Needs cluster A up.** Derives provider-ws kubeconfig → Secret in B |
 | `syncagent:install` | `hack/syncagent-install.sh` | syncagent-expert | ✅ | Helm install/upgrade |
 | `syncagent:publish` | `hack/syncagent-publish.sh` | syncagent-expert | ✅ | `PublishedResource` + RBAC; triggers schema generation in A |
+| `bind` | `hack/provider-bind.sh` | kcp-expert | ✅ | **Run before order.** Patches the account's claim-less auto-binding (or applies `config/kcp/apibinding.yaml`) to Accept namespaces/secrets/events; gates on Bound **and** `PermissionClaimsApplied=True`. Non-interactive (`--server=.../clusters/$CONSUMER_WS`) |
 | `order` | `hack/order.sh` | postgres-expert | ✅ | `apply` Cluster/pg-demo into `CONSUMER_WS` |
 | `verify` | `test/e2e.sh` | test-verifier | read-only | Full loop; expects PostgreSQL 15 |
 | `status` | inline | developer | read-only | Safe any time |
@@ -158,7 +164,10 @@ There are **no `kcp:*` targets** — kcp is cluster A's, not a host process.
   `docker network inspect kind -f '{{ (index .IPAM.Config 0).Gateway }}'`.
 - **TLS/routing errors despite reachability** — confirm the agent connects as `root.kcp.localhost`
   (SNI); any other name fails A's Istio SNI routing.
-- **`APIBinding` never reaches `Bound` / Secret never syncs back** — confirm all three
-  permissionClaims are Accepted on the account binding (Workstream A).
+- **Secret never syncs back even though the binding is `Bound`** — this is the silent trap: the
+  operator's auto-binding is claim-less. Run `task bind CONSUMER_WS=...` (gates on
+  `PermissionClaimsApplied=True`, not just Bound). If the live binding presents the v1alpha2 claim
+  shape (`selector.matchAll`) the script falls back to it automatically; inspect with
+  `kubectl --kubeconfig "$KCP_KUBECONFIG" --server="https://root.kcp.localhost:8443/clusters/$CONSUMER_WS" get apibinding <name> -o yaml`.
 - **Inspect the agent:**
   `kubectl --kubeconfig .kube/kind.kubeconfig -n kcp-system logs -l app.kubernetes.io/name=kcp-api-syncagent --tail=80`

@@ -107,9 +107,14 @@ tasks:
     desc: "Apply on-cluster RBAC + PublishedResource for the CNPG Cluster (+ related Secret)"
     cmds: [ bash hack/syncagent-publish.sh ]
 
+  # owner script: hack/provider-bind.sh + config/kcp/apibinding.yaml   (kcp-expert)
+  bind:
+    desc: "Bind CONSUMER_WS to postgresql.cnpg.io accepting all 3 claims (run BEFORE order; set CONSUMER_WS)"
+    cmds: [ bash hack/provider-bind.sh ]
+
   # owner script: hack/order.sh + config/samples/order-cluster.yaml   (postgres-expert)
   order:
-    desc: "Order a Postgres 15: create Cluster {{.ORDER_NAME}} in consumer ws {{.CONSUMER_WS}} (set CONSUMER_WS first)"
+    desc: "Order a Postgres 15: create Cluster {{.ORDER_NAME}} in consumer ws {{.CONSUMER_WS}} (run bind first)"
     cmds: [ bash hack/order.sh ]
 
   # owner script: test/e2e.sh   (test-verifier)
