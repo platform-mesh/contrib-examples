@@ -214,6 +214,56 @@ The verified loop above uses **kubectl**. Ordering via the **portal** additional
 
 ---
 
+## Explore it yourself
+
+After cluster A (`task local-setup:example-data`) + cluster B (the `task` sequence above) + a portal
+order, the environment is left **running** for hands-on exploration (the #12 validation deliberately
+skips the final `task down`). Values below are from the verified #12 run.
+
+### Portal (UI)
+
+- **URL:** <https://portal.localhost:8443> (redirects to Keycloak).
+- **Login — self-registration (no pre-seeded user).** The #12 run registered **`username@sap.com` /
+  `MyPass1234`** (first/last name `Firstname`/`Lastname`); log in with those, or click **Register** to
+  create your own. (Keycloak admin console: <https://portal.localhost:8443/keycloak>, `keycloak-admin` /
+  `admin`.)
+- **Organization:** select/switch to **`default`** → the org portal opens at
+  <https://default.portal.localhost:8443/home>.
+- **Account:** **`pgportal-acct`** (kcp path `root:orgs:default:pgportal-acct`).
+- **Your Postgres instance:** in the account open **“Postgres Databases”** →
+  `https://default.portal.localhost:8443/home/accounts/pgportal-acct/postgresql_cnpg_io_clusters` →
+  the Cluster **`pg-portal`** (“Cluster in healthy state”). Order more with the **Create** button
+  (PostgreSQL 15 image, storage size, instances).
+
+### kubectl (CLI)
+
+`KC=<helm-charts>/.secret/kcp/admin.kubeconfig` · `KB=<this-dir>/.kube/kind.kubeconfig`
+
+- **Portal-ordered instance** (consumer = the account ws):
+
+  ```sh
+  KUBECONFIG=$KC kubectl ws root:orgs:default:pgportal-acct   # navigate (revert later: kubectl ws :root)
+  KUBECONFIG=$KC kubectl -n default get cluster pg-portal -o wide
+  KUBECONFIG=$KC kubectl -n default get secret pg-portal-app   # connection Secret synced back up
+  ```
+
+- **kubectl-ordered example instance** (standalone consumer ws `root:consumer-pg`): same commands with
+  `kubectl ws root:consumer-pg` + `get cluster pg-demo` / `get secret pg-demo-app`.
+- **Backing cluster B** (where the databases actually run):
+
+  ```sh
+  kubectl --kubeconfig $KB get clusters.postgresql.cnpg.io -A          # pg-demo + pg-portal
+  kubectl --kubeconfig $KB -n default get pods,svc,secret -l cnpg.io/cluster=pg-portal
+  ```
+
+- **Live query** (PostgreSQL 15.x via the synced creds): `task verify CONSUMER_WS=root:consumer-pg`
+  (drives a one-shot `psql` Job in B → `SELECT version()` → `PostgreSQL 15.18`), or run an equivalent
+  Job against `pg-portal-rw` using the `pg-portal-app` Secret.
+
+> **Tear down when done:** `task down` (cluster B) + `kind delete cluster --name platform-mesh` (cluster A).
+
+---
+
 ## Per-target reference
 
 | Target | Script / Entrypoint | Owner | Idempotent? | Notes |
