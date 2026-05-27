@@ -13,8 +13,11 @@
 #     (the live path for account workspaces);
 #   * else -> apply config/kcp/apibinding.yaml (a manual/non-account consumer ws).
 # kcp v0.31 serves APIBinding in both v1alpha1 (claim shape `all: true`) and v1alpha2
-# (`selector.matchAll: true`); which the live object presents is unpredictable, so the patch is tried
-# in the v1alpha1 shape first and falls back to v1alpha2, gating success on PermissionClaimsApplied.
+# (`selector.matchAll: true`). To stay deterministic we PIN the patch to the v1alpha1 endpoint
+# (apibindings.v1alpha1.apis.kcp.io) so `all: true` is always valid and kcp converts to storage —
+# this avoids a silent no-op if the live object's served shape is v1alpha2. Only if that endpoint is
+# unavailable do we fall back to the v1alpha2 endpoint + selector shape. Either way success is gated
+# on condition PermissionClaimsApplied=True (the apply branch pins v1alpha1 via the manifest itself).
 #
 # NON-INTERACTIVE: addresses the workspace via --server=.../clusters/$CONSUMER_WS rather than the
 # `kubectl ws` plugin (which rejects --kubeconfig and would mutate the shared admin kubeconfig).
@@ -83,10 +86,10 @@ BINDING_NAME="$(find_binding)"
 
 if [ -n "${BINDING_NAME}" ]; then
   say "found existing APIBinding '${BINDING_NAME}' (operator auto-binding) -> patching permissionClaims"
-  if kc patch apibindings.apis.kcp.io "${BINDING_NAME}" --type=merge -p "${CLAIMS_V1A1}" >/dev/null 2>&1 && wait_claims_applied 30; then
-    say "claims applied (v1alpha1 'all:true' shape)"
-  elif kc patch apibindings.apis.kcp.io "${BINDING_NAME}" --type=merge -p "${CLAIMS_V1A2}" >/dev/null 2>&1 && wait_claims_applied 30; then
-    say "claims applied (v1alpha2 'selector.matchAll' shape)"
+  if kc patch apibindings.v1alpha1.apis.kcp.io "${BINDING_NAME}" --type=merge -p "${CLAIMS_V1A1}" >/dev/null 2>&1 && wait_claims_applied 30; then
+    say "claims applied (pinned v1alpha1 'all:true' endpoint)"
+  elif kc patch apibindings.v1alpha2.apis.kcp.io "${BINDING_NAME}" --type=merge -p "${CLAIMS_V1A2}" >/dev/null 2>&1 && wait_claims_applied 30; then
+    say "claims applied (fallback v1alpha2 'selector.matchAll' endpoint)"
   else
     kc get apibinding "${BINDING_NAME}" -o yaml 2>/dev/null | sed -n '/status:/,$p' >&2 || true
     die "could not get PermissionClaimsApplied=True on '${BINDING_NAME}' with either claim shape"
