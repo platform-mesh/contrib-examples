@@ -1,0 +1,61 @@
+# config/syncagent/publishedresource-cluster.yaml — owner: syncagent-expert
+# Applied on the KIND cluster (CRD installed by the api-syncagent Helm chart). It tells the agent
+# to publish CloudNativePG's native Cluster API into kcp — the agent generates an APIResourceSchema
+# from the CRD and adds it to the APIExport `api-syncagent` in the provider workspace — and to sync
+# the generated connection Secret back to the consumer alongside the Cluster.
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: cnpg-clusters
+spec:
+  resource:
+    apiGroup: postgresql.cnpg.io
+    kind: Cluster
+    # `versions: [v1]` is the v0.6.0 non-deprecated form of the requested `version: v1`
+    # (the singular `.spec.resource.version` field is deprecated in the PublishedResource CRD).
+    versions:
+      - v1
+
+  # !! GOAL-1 SINGLE-CONSUMER SIMPLIFICATION — MUST BE REMOVED FOR GOAL 2 !!
+  # This `naming` block preserves the consumer's name + namespace on the service cluster instead of
+  # the agent's DEFAULT anti-collision hashing. It makes the on-kind objects predictable — Cluster
+  # `pg-demo` in ns `default`, pods `pg-demo-N`, Secret `pg-demo-app` — matching docs/architecture.md
+  # and the CNPG live-test Job in config/cnpg/NOTES.md.
+  # It is SAFE ONLY because goal 1 is single-consumer / single-order. For the multi-consumer goal 2,
+  # DELETE this entire `naming` block to restore the default hashing — otherwise two consumers that
+  # order the same name/namespace would COLLIDE on kind (the default hashing exists precisely to
+  # prevent that). The kcp-side synced Secret is `pg-demo-app` with or without this block.
+  naming:
+    name: "{{ .Object.metadata.name }}"
+    namespace: "{{ .Object.metadata.namespace }}"
+
+  related:
+    # --- Connection Secret sync-back ---------------------------------------------------------
+    # CNPG names the application connection Secret `<cluster>-app` (the suffix is the literal
+    # "-app"; see CNPG api/v1 ApplicationUserSecretSuffix). That name is DERIVED at runtime, not a
+    # field in the Cluster spec, so an `object.reference` JSONPath into the spec cannot locate it.
+    #
+    # A Go-template name expression is the right tool: api-syncagent evaluates it on BOTH sides of
+    # the sync, each time against the primary (Cluster) object as it exists on THAT side. Because
+    # CNPG always derives the Secret name from the local Cluster name, the template lines up with
+    # reality on each side automatically:
+    #   * service side (kind):     "{{ .Object.metadata.name }}-app" → "<renamed-cluster>-app"
+    #                              (the agent renames synced objects; CNPG sees that local name and
+    #                               creates the Secret accordingly — the template matches it)
+    #   * destination side (kcp):  "{{ .Object.metadata.name }}-app" → "pg-demo-app"
+    #                              (a clean, stable name next to the consumer's Cluster)
+    # This is robust regardless of the bootstrap `owner` value, because the suffix is always "-app".
+    #
+    # origin: service → the Secret originates on the service cluster (created by CNPG) and is
+    # synced UP to the consumer workspace. By default a related object lives in the same namespace
+    # as its primary object on each side, which matches CNPG (Secret sits beside its Cluster), so
+    # no `object.namespace` override is needed.
+    - identifier: connection
+      origin: service
+      # GVR of the related resource (v0.6.0 form; the `kind:` shorthand is deprecated).
+      group: ""
+      version: v1
+      resource: secrets
+      object:
+        template:
+          template: "{{ .Object.metadata.name }}-app"

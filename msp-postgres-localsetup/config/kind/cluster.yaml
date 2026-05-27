@@ -1,0 +1,24 @@
+# kind cluster config for the msp-postgres-localsetup BACKING cluster (cluster B).
+#
+# This is the data-plane cluster: it runs CloudNativePG + the api-syncagent only. The control
+# plane (kcp + portal) lives in the separate Platform Mesh local-setup cluster (cluster A); the
+# agent in THIS cluster connects OUTBOUND to cluster A's kcp.
+#
+# Cluster name is `msp-postgres-backing` so it never collides with the standalone `msp-postgres`
+# example's cluster. kind always attaches its nodes to the default `kind` Docker network, so this
+# cluster shares a network with the local-setup cluster A out of the box.
+#
+# Pinned node image: kindest/node:v1.32.0 — the default image shipped with kind v0.31.0.
+# The kindest/node images are multi-arch manifest lists; Docker Desktop on macOS arm64 will
+# automatically pull the arm64 variant.
+#
+# Docker Desktop note: no extra networking config is needed. Docker Desktop injects
+# `host.docker.internal` into every container, so pods running here can reach the host — where
+# cluster A's kcp front-proxy is published (host 127.0.0.1:8443) — via that hostname out of the
+# box. See the hostAliases fallback in config/syncagent/values.yaml if DNS resolution fails.
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: msp-postgres-backing
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.32.0

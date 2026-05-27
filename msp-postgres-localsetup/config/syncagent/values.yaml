@@ -1,0 +1,76 @@
+# Helm values for the kcp api-syncagent — chart `kcp/api-syncagent` v0.6.0
+# (repo https://kcp-dev.github.io/helm-charts, image ghcr.io/kcp-dev/api-syncagent:v0.6.0).
+# Installed into namespace kcp-system on the BACKING kind cluster (cluster B) by
+# hack/syncagent-install.sh.
+#
+# Rendered objects (Helm release name `kcp-api-syncagent`, chart name `api-syncagent`):
+#   - ServiceAccount `kcp-api-syncagent`  (fullname == release name; matched by config/syncagent/rbac.yaml)
+#   - Deployment     `kcp-api-syncagent`
+#
+# HOW THE AGENT REACHES cluster A's kcp (two hops — BOTH must resolve/connect from inside the
+# kind pod in cluster B):
+#   1. Bootstrap: the agent reads Secret `kcp-kubeconfig` (key `kubeconfig`), built by
+#      hack/syncagent-kubeconfig.sh to point at the provider workspace
+#      (root:providers:postgres-provider) via https://host.docker.internal:8443 with
+#      insecure-skip-tls-verify.
+#   2. Serving: the agent then follows the APIExportEndpointSlice `postgresql.cnpg.io` in that
+#      workspace; the slice's virtual-workspace URL host is whatever cluster A's kcp advertises.
+#      That host MUST therefore also be host.docker.internal so the pod can reach it (the A-side
+#      kcp-reachability change is owned by the provider-portal/integrator workstream). See the
+#      hostAliases fallback at the bottom if the pod cannot resolve the name.
+
+# ==========================================================================================
+# INTEGRATION CONTRACT — these two names MUST equal the APIExport that provider-portal creates
+# in cluster A's root:providers:postgres-provider workspace (Workstream A). The standalone
+# msp-postgres example uses the name `api-syncagent`; for portal integration we use the CNPG
+# group name `postgresql.cnpg.io`. kcp auto-creates a default APIExportEndpointSlice named after
+# the APIExport, so both values are simply the APIExport name. (APIExport names are arbitrary in
+# kcp — driving one named `postgresql.cnpg.io` in passthrough mode works exactly like any other.)
+# ==========================================================================================
+
+# Required — the APIExportEndpointSlice the agent serves (auto-created by kcp, named after the
+# APIExport `postgresql.cnpg.io`). In the v0.6.0 chart this is THE knob that wires the agent: it
+# renders the container flag `--apiexportendpointslice-ref=postgresql.cnpg.io`, and the agent
+# discovers the APIExport (to attach generated APIResourceSchemas to) by following that slice.
+apiExportEndpointSliceName: postgresql.cnpg.io
+
+# Documents the integration contract (the APIExport name). NOTE: the api-syncagent v0.6.0 Helm
+# chart does NOT consume an `apiExportName` value — it is inert here (verified via `helm template`:
+# only `--apiexportendpointslice-ref` is rendered). Kept to make the contract explicit and for
+# forward-compat; the actual wiring is `apiExportEndpointSliceName` above.
+apiExportName: postgresql.cnpg.io
+
+# Required — name of the Secret (with a `kubeconfig` key) holding the provider-workspace-scoped
+# kcp kubeconfig. Created on the backing kind cluster in ns kcp-system by hack/syncagent-kubeconfig.sh.
+kcpKubeconfig: kcp-kubeconfig
+
+# Informational (the agent's public name). Distinct from the standalone example so the two agents
+# never share an identity; also the value of the `syncagent.kcp.io/agent-name` label on synced
+# objects, which test/e2e.sh keys on via the AGENT_NAME env var (set in Taskfile.yml to match).
+agentName: msp-postgres-backing
+
+# Single agent on kind: one replica, leader election off (lighter than the default 2 + election).
+replicas: 1
+enableLeaderElection: false
+
+# Pin to the matched app version for reproducibility (chart appVersion is already v0.6.0).
+image:
+  repository: ghcr.io/kcp-dev/api-syncagent
+  tag: v0.6.0
+
+# Install the PublishedResource CRD with the chart (default; the CR is applied later by
+# hack/syncagent-publish.sh, which runs after install).
+crds:
+  enabled: true
+
+# FALLBACK for cluster-B-pod -> cluster-A-kcp connectivity. The kind config
+# (config/kind/cluster.yaml) assumes Docker Desktop makes `host.docker.internal` resolvable from
+# kind pods. If that is NOT the case in a given CoreDNS setup, enable this and set ip to the kind
+# docker network's host-gateway (the host where cluster A's front-proxy :8443 is published):
+#   docker network inspect kind -f '{{ (index .IPAM.Config 0).Gateway }}'   # often 172.18.0.1
+# hostAliases:
+#   enabled: true
+#   values:
+#     - ip: "172.18.0.1"
+#       hostnames:
+#         - host.docker.internal

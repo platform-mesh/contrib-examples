@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# hack/syncagent-kubeconfig.sh — owner: syncagent-expert
+#
+# Build the kubeconfig the api-syncagent (running INSIDE the backing kind cluster B) uses to reach
+# CLUSTER A's kcp, and store it as a Secret on the backing cluster. Idempotent.
+#
+# What it does:
+#   1. Copies cluster A's admin kubeconfig ($KCP_KUBECONFIG) and navigates the COPY to the provider
+#      workspace ($PROVIDER_WS) with `kubectl ws` (does not disturb the shared admin kubeconfig).
+#   2. Minifies+flattens it to a single self-contained cluster/context/user.
+#   3. Rewrites the server to https://$KCP_EXTERNAL_HOST:$KCP_PORT/<path> (path preserved) and sets
+#      insecure-skip-tls-verify: true (dropping the CA bundle) — this makes cluster A's kcp reachable,
+#      and TLS acceptable, from inside the backing kind network. Final server:
+#      https://host.docker.internal:8443/clusters/root:providers:postgres-provider
+#   4. Stores it on the backing cluster as Secret `kcp-kubeconfig` (key `kubeconfig`) in ns kcp-system.
+#
+# Reads env vars exported by Taskfile.yml; do NOT hardcode paths/hosts/workspaces:
+#   KCP_KUBECONFIG, KIND_KUBECONFIG, PROVIDER_WS, KCP_EXTERNAL_HOST, KCP_PORT
+#
+# !! RUNTIME DEPENDENCY ON CLUSTER A — run this only AFTER cluster A is up !!
+# $KCP_KUBECONFIG points at the Platform Mesh local-setup admin kubeconfig
+# (helm-charts/.secret/kcp/admin.kubeconfig). That file is minted by cluster A's start.sh, and the
+# provider workspace ($PROVIDER_WS) is created by the provider-portal workstream. So this script
+# cannot succeed until the integrator has stood up cluster A (and applied the postgres-provider
+# example-data). Inputs are read at run time; it fails loudly with guidance if cluster A is absent.
+#
+# !! CONNECTIVITY DEPENDENCY !!
+# This script only fixes hop #1 (the bootstrap kubeconfig the agent reads). The agent then follows
+# the APIExportEndpointSlice `postgresql.cnpg.io` virtual-workspace URL; THAT host is whatever
+# cluster A's kcp advertises. For the agent to reach it, cluster A's kcp MUST advertise
+# $KCP_EXTERNAL_HOST (host.docker.internal) for its front-proxy / virtual-workspace URLs (the A-side
+# change owned by the provider-portal/integrator workstream).
+# Also: the admin kubeconfig at $KCP_KUBECONFIG must be reachable from THIS host (where `kubectl ws`
+# runs) — cluster A's front-proxy on 127.0.0.1:$KCP_PORT. The rewrite below swaps that host for the
+# kind-reachable one only in the agent's copy.
+set -euo pipefail
+
+: "${KCP_KUBECONFIG:?KCP_KUBECONFIG must be set}"
+: "${KIND_KUBECONFIG:?KIND_KUBECONFIG must be set}"
+: "${PROVIDER_WS:?PROVIDER_WS must be set}"
+: "${KCP_EXTERNAL_HOST:?KCP_EXTERNAL_HOST must be set}"
+: "${TASKFILE_DIR:?TASKFILE_DIR must be set}"
+# KCP_PORT is optional: when set (Taskfile exports 8443) it pins the rewritten server port; when
+# unset the port is derived from cluster A's kubeconfig server URL (standalone-run fallback).
+KCP_PORT="${KCP_PORT:-}"
+
+# Fail early & clearly if cluster A's admin kubeconfig is not present yet.
+if [[ ! -s "${KCP_KUBECONFIG}" ]]; then
+  echo "ERROR: cluster A admin kubeconfig not found at ${KCP_KUBECONFIG}" >&2
+  echo "       Stand up the Platform Mesh local-setup (cluster A) on the feat/msp-postgres-localsetup" >&2
+  echo "       branch first, then re-run 'task syncagent:kubeconfig'." >&2
+  exit 1
+fi
+
+# `kubectl ws` is the kcp kubectl plugin. Prefer a bin/ copy if present, otherwise rely on the
+# globally-installed plugin (the Platform Mesh local-setup requires kubectl-ws/kubectl-kcp anyway).
+export PATH="${TASKFILE_DIR}/bin:${PATH}"
+
+SNAP="$(mktemp -t kcp-syncagent-snap.XXXXXX)"
+AGENT_KC="$(mktemp -t kcp-syncagent-kubeconfig.XXXXXX)"
+cleanup() { rm -f "${SNAP}" "${AGENT_KC}" "${AGENT_KC}.tmp"; }
+trap cleanup EXIT
+
+echo "==> Snapshotting kcp kubeconfig and entering provider workspace: ${PROVIDER_WS}"
+cp "${KCP_KUBECONFIG}" "${SNAP}"
+KUBECONFIG="${SNAP}" kubectl ws "${PROVIDER_WS}"
+
+# Reduce to just the current (provider-ws) context, with certs/tokens embedded inline.
+KUBECONFIG="${SNAP}" kubectl config view --raw --minify --flatten > "${AGENT_KC}"
+
+# After --minify there is exactly one cluster; read its name + server.
+CLUSTER="$(KUBECONFIG="${AGENT_KC}" kubectl config view -o jsonpath='{.clusters[0].name}')"
+OLD_SERVER="$(KUBECONFIG="${AGENT_KC}" kubectl config view -o jsonpath='{.clusters[0].cluster.server}')"
+if [[ -z "${OLD_SERVER}" ]]; then
+  echo "ERROR: could not read server URL from the provider-workspace kubeconfig" >&2
+  exit 1
+fi
+
+# Parse https://HOST:PORT/PATH... → keep PATH, swap HOST for $KCP_EXTERNAL_HOST. Use $KCP_PORT when
+# set (pins cluster A's front-proxy port, 8443), else fall back to the snapshot's port, else 443.
+rest="${OLD_SERVER#*://}"        # HOST:PORT/PATH...
+hostport="${rest%%/*}"          # HOST:PORT
+path="${rest#"${hostport}"}"    # /PATH... (possibly empty)
+port="${KCP_PORT}"
+if [[ -z "${port}" ]]; then
+  if [[ "${hostport}" == *:* ]]; then
+    port="${hostport##*:}"
+  else
+    port="443"
+  fi
+fi
+NEW_SERVER="https://${KCP_EXTERNAL_HOST}:${port}${path}"
+
+echo "==> Rewriting agent kubeconfig server: ${OLD_SERVER} -> ${NEW_SERVER} (insecure-skip-tls-verify)"
+# Drop the CA bundle first (it conflicts with insecure-skip-tls-verify and is host-specific anyway),
+# then set the kind-reachable server + insecure flag. The grep filter is name-agnostic and portable
+# across BSD/GNU sed.
+grep -v 'certificate-authority-data:' "${AGENT_KC}" > "${AGENT_KC}.tmp" && mv "${AGENT_KC}.tmp" "${AGENT_KC}"
+KUBECONFIG="${AGENT_KC}" kubectl config set-cluster "${CLUSTER}" \
+  --server="${NEW_SERVER}" --insecure-skip-tls-verify=true >/dev/null
+
+echo "==> Ensuring namespace kcp-system on kind"
+kubectl --kubeconfig "${KIND_KUBECONFIG}" create namespace kcp-system \
+  --dry-run=client -o yaml | kubectl --kubeconfig "${KIND_KUBECONFIG}" apply -f -
+
+echo "==> Storing Secret kcp-kubeconfig (key 'kubeconfig') in kcp-system"
+kubectl --kubeconfig "${KIND_KUBECONFIG}" create secret generic kcp-kubeconfig \
+  --namespace kcp-system \
+  --from-file "kubeconfig=${AGENT_KC}" \
+  --dry-run=client -o yaml | kubectl --kubeconfig "${KIND_KUBECONFIG}" apply -f -
+
+echo "==> Done. The agent will read the provider-workspace kubeconfig from this Secret."

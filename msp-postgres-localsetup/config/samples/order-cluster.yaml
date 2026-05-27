@@ -1,0 +1,24 @@
+# config/samples/order-cluster.yaml — owner: postgres-expert
+# Consumer-facing Cluster CR applied into the kcp consumer (account) workspace in cluster A.
+# api-syncagent (in the backing cluster B) syncs this DOWN to kind where CNPG provisions the
+# real Postgres, then syncs status + the connection Secret back UP to the consumer workspace.
+#
+# PostgreSQL 15: imageName pins the major version so "order Postgres 15" is literal. CNPG picks
+# the matching minor tag (e.g. :15) from ghcr.io/cloudnative-pg/postgresql.
+#
+# CNPG will generate the connection Secret named "<cluster>-app" = "pg-demo-app"
+# (type kubernetes.io/basic-auth). See config/cnpg/NOTES.md for all keys.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-demo
+  namespace: default
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:15
+  storage:
+    size: 1Gi
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: app
