@@ -1,0 +1,13 @@
+# pinned tools (fetched by `task tools:kcp`)
+/bin/
+
+# local kcp state
+/.kcp/
+
+# exported kind kubeconfig
+/.kube/
+
+# temp kubeconfigs & generated artifacts
+*.tmp.kubeconfig
+*.tmp.yaml
+/tmp/

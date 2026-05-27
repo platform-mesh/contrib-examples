@@ -1,0 +1,37 @@
+# config/syncagent/rbac.yaml — owner: syncagent-expert
+# Applied on the KIND cluster. Grants the api-syncagent ServiceAccount the permissions it needs to
+# reconcile the PUBLISHED resource and its related Secret on the service cluster.
+#
+# ServiceAccount: kcp-api-syncagent / namespace kcp-system  (created by the Helm chart; the
+# release name `kcp-api-syncagent` equals the chart fullname, so SA name == release name).
+#
+# The chart's own ClusterRole (`kcp-api-syncagent:kcp-system`) already covers namespaces,
+# customresourcedefinitions (CRD read → builds the APIResourceSchema), publishedresources, and
+# secrets with get/list/watch/create/update. This role adds what is specific to THIS published API:
+#   * the CNPG Cluster CR (clusters + clusters/status) — the agent creates/updates synced Clusters
+#     and reads their status to sync it back to kcp;
+#   * full secret verbs (incl. patch/delete) so the synced connection Secret can be fully reconciled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kcp-api-syncagent:cnpg-clusters
+rules:
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "clusters/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kcp-api-syncagent:cnpg-clusters
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kcp-api-syncagent:cnpg-clusters
+subjects:
+  - kind: ServiceAccount
+    name: kcp-api-syncagent
+    namespace: kcp-system

@@ -1,0 +1,17 @@
+# Initial, EMPTY APIExport for the Postgres MSP.
+# Owner: kcp-expert (manifest) / syncagent-expert (runtime population).
+#
+# The api-syncagent (v0.6.0) auto-populates this export as PublishedResources are created on the
+# kind service cluster: it generates the APIResourceSchema for clusters.postgresql.cnpg.io, appends
+# it to spec.latestResourceSchemas, and adds the permissionClaims it needs (e.g. secrets, for the
+# related connection Secret). We therefore ship it empty and let the agent own its contents.
+#
+# Version: apis.kcp.io/v1alpha1 — matches the kcp onboarding demo-guide and is served by kcp
+# v0.31.2 (kcp also serves v1alpha2; the agent reconciles this object regardless of the stored
+# version via kcp's built-in conversion). Applied in the provider workspace root:msp:postgres-provider.
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIExport
+metadata:
+  name: api-syncagent
+spec:
+  latestResourceSchemas: []

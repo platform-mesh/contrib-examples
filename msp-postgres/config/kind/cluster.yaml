@@ -1,0 +1,15 @@
+# kind cluster config for the msp-postgres example.
+#
+# Pinned node image: kindest/node:v1.32.0 — the default image shipped with kind v0.31.0.
+# The kindest/node images are multi-arch manifest lists; Docker Desktop on macOS arm64 will
+# automatically pull the arm64 variant.
+#
+# Docker Desktop note: no extra networking config is needed. Docker Desktop injects
+# `host.docker.internal` into every container, so pods running in kind can reach the
+# host (where kcp listens) via that hostname out of the box.
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: msp-postgres
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.32.0

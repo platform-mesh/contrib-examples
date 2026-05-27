@@ -1,0 +1,43 @@
+# Consumer-side APIBinding: binds the consumer workspace (root:msp:customer-a) to the provider's
+# api-syncagent APIExport so that clusters.postgresql.cnpg.io is served natively in the consumer ws.
+# Owner: kcp-expert. Applied by hack/provider-bind.sh in the consumer workspace.
+#
+# spec.reference.export.path MUST equal $PROVIDER_WS (root:msp:postgres-provider). provider-bind.sh
+# asserts this at apply time so a drift in the Taskfile var fails loudly instead of silently
+# producing an unbindable APIBinding.
+#
+# permissionClaims: api-syncagent v0.6.0 AUTO-ADDS three core (group "") permissionClaims to the
+# APIExport for this PublishedResource (publishing a Cluster + 1 related Secret): namespaces, secrets,
+# and events — each with all: true. The consumer binding MUST Accept ALL THREE, or the APIBinding
+# never reaches phase Bound and the connection Secret never syncs back (silent-failure trap). Source-
+# verified with syncagent-expert against v0.6.0. Leaving any of them unaccepted = the agent errors.
+#   - namespaces: agent creates/uses the target namespace for synced objects.
+#   - secrets:    syncs the CloudNativePG connection Secret (e.g. pg-demo-app) back as a related obj.
+#   - events:     syncs events for the published objects.
+#
+# Field keys are kcp's APIBinding GroupResource shape: `group` (core = "") + `resource` (PLURAL
+# resource name). NB: api-syncagent's own docs write these as `resources:` — that key does NOT match
+# kcp's type; we use `resource:` (singular key) as validated by the kcp v0.31.2 APIBinding schema and
+# the onboarding demo-guide. Version apis.kcp.io/v1alpha1 (served by kcp v0.31.2).
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: api-syncagent
+spec:
+  reference:
+    export:
+      path: root:msp:postgres-provider
+      name: api-syncagent
+  permissionClaims:
+    - group: ""
+      resource: namespaces
+      all: true
+      state: Accepted
+    - group: ""
+      resource: secrets
+      all: true
+      state: Accepted
+    - group: ""
+      resource: events
+      all: true
+      state: Accepted

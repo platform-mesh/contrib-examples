@@ -1,0 +1,19 @@
+# config/samples/order-cluster.yaml — owner: postgres-expert
+# Consumer-facing Cluster CR applied into the kcp consumer workspace.
+# api-syncagent syncs this to kind where CNPG provisions the real Postgres.
+#
+# CNPG will generate the connection Secret named "<cluster>-app" = "pg-demo-app"
+# (type kubernetes.io/basic-auth). See config/cnpg/NOTES.md for all keys.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg-demo
+  namespace: default
+spec:
+  instances: 1
+  storage:
+    size: 1Gi
+  bootstrap:
+    initdb:
+      database: appdb
+      owner: app

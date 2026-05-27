@@ -1,0 +1,162 @@
+# Taskfile for the Postgres MSP example (Platform Mesh / kcp + api-syncagent + CloudNativePG).
+#
+# DESIGN: this file is a THIN ORCHESTRATOR. Each target calls one script in hack/ owned by one
+# expert, so multiple agents never edit this file. Owner of THIS file: `developer` (pipeline
+# ordering, vars/env contract, idempotency, UX). Owners of the hack/ scripts + config/ manifests
+# are noted per target.
+#
+# Pinned, mutually-compatible versions (do not bump without coordinating):
+#   kcp v0.31.2  +  api-syncagent v0.6.0 (targets kcp 0.31)  +  CloudNativePG v1.29.1
+#
+# SHARED-STATE RULE: live bring-up touches ONE kcp process + ONE kind cluster + stateful
+# kubeconfigs. Only the integration runner (test-verifier / lead) executes up/order/verify/down.
+# Experts author + self-validate their scripts/manifests (shellcheck, yamllint, helm template,
+# kubectl create --dry-run=client for built-in kinds) WITHOUT starting the live stack.
+#
+# Every hack/ script runs under `set -euo pipefail` and reads the env vars exported below.
+
+version: '3'
+
+vars:
+  KCP_VERSION: v0.31.2
+  SYNCAGENT_VERSION: "0.6.0"
+  CNPG_VERSION: "1.29.1"
+  KIND_CLUSTER: msp-postgres
+  KIND_CONTEXT: kind-msp-postgres
+  PROVIDER_WS: 'root:msp:postgres-provider'
+  CONSUMER_WS: 'root:msp:customer-a'
+  ORDER_NAME: pg-demo
+  ORDER_NS: default
+  KCP_EXTERNAL_HOST: host.docker.internal
+
+# Exported to every hack/ script. Scripts read these — do not hardcode values in scripts.
+# KUBECONFIG defaults to the kcp admin kubeconfig. KCP operations use it (or --kubeconfig
+# "$KCP_KUBECONFIG"); KIND operations MUST be explicit: kubectl --kubeconfig "$KIND_KUBECONFIG".
+env:
+  KUBECONFIG: '{{.TASKFILE_DIR}}/.kcp/admin.kubeconfig'
+  TASKFILE_DIR: '{{.TASKFILE_DIR}}'
+  KCP_BIN: '{{.TASKFILE_DIR}}/bin/kcp'
+  KCP_KUBECONFIG: '{{.TASKFILE_DIR}}/.kcp/admin.kubeconfig'
+  KIND_KUBECONFIG: '{{.TASKFILE_DIR}}/.kube/kind.kubeconfig'
+  KCP_VERSION: '{{.KCP_VERSION}}'
+  SYNCAGENT_VERSION: '{{.SYNCAGENT_VERSION}}'
+  CNPG_VERSION: '{{.CNPG_VERSION}}'
+  KIND_CLUSTER: '{{.KIND_CLUSTER}}'
+  KIND_CONTEXT: '{{.KIND_CONTEXT}}'
+  PROVIDER_WS: '{{.PROVIDER_WS}}'
+  CONSUMER_WS: '{{.CONSUMER_WS}}'
+  ORDER_NAME: '{{.ORDER_NAME}}'
+  ORDER_NS: '{{.ORDER_NS}}'
+  KCP_EXTERNAL_HOST: '{{.KCP_EXTERNAL_HOST}}'
+
+tasks:
+  default:
+    cmds: [ task --list ]
+    silent: true
+
+  # owner script: hack/tools-check.sh   (k8s-expert)
+  tools:check:
+    desc: "Verify required CLIs (kubectl, kind, docker, helm) and print versions"
+    cmds: [ bash hack/tools-check.sh ]
+
+  # owner script: hack/tools-kcp.sh     (kcp-expert) — pins kcp into bin/
+  tools:kcp:
+    desc: "Download & pin kcp {{.KCP_VERSION}} into bin/ (non-destructive)"
+    status:
+      - test -x {{.KCP_BIN}}
+    cmds: [ bash hack/tools-kcp.sh ]
+
+  # owner script: hack/kind-up.sh + config/kind/cluster.yaml   (k8s-expert)
+  kind:up:
+    desc: "Create the kind cluster {{.KIND_CLUSTER}}"
+    cmds: [ bash hack/kind-up.sh ]
+  kind:down:
+    desc: "Delete the kind cluster {{.KIND_CLUSTER}}"
+    cmds: [ bash hack/kind-down.sh ]
+
+  # owner script: hack/cnpg-install.sh + config/samples/order-cluster.yaml   (postgres-expert)
+  cnpg:install:
+    desc: "Install CloudNativePG {{.CNPG_VERSION}} into kind and wait until ready"
+    cmds: [ bash hack/cnpg-install.sh ]
+
+  # owner scripts: hack/kcp-*.sh + config/kcp/*.yaml   (kcp-expert)
+  kcp:start:
+    desc: "Start kcp {{.KCP_VERSION}} locally, reachable from kind via {{.KCP_EXTERNAL_HOST}}"
+    cmds: [ bash hack/kcp-start.sh ]
+  kcp:stop:
+    desc: "Stop the local kcp process"
+    cmds: [ bash hack/kcp-stop.sh ]
+  kcp:workspaces:
+    desc: "Create provider+consumer workspaces and the initial empty APIExport"
+    cmds: [ bash hack/kcp-workspaces.sh ]
+  provider:bind:
+    desc: "Create the APIBinding in the consumer workspace; assert the Cluster API is served"
+    cmds: [ bash hack/provider-bind.sh ]
+
+  # owner scripts: hack/syncagent-*.sh + config/syncagent/*.yaml   (syncagent-expert)
+  syncagent:kubeconfig:
+    desc: "Build provider-workspace kubeconfig & store it as a Secret in kind"
+    cmds: [ bash hack/syncagent-kubeconfig.sh ]
+  syncagent:install:
+    desc: "Helm-install api-syncagent {{.SYNCAGENT_VERSION}} into kind"
+    cmds: [ bash hack/syncagent-install.sh ]
+  syncagent:publish:
+    desc: "Apply on-kind RBAC + PublishedResource for the CNPG Cluster (+ related Secret)"
+    cmds: [ bash hack/syncagent-publish.sh ]
+
+  # owner script: hack/order.sh + config/samples/order-cluster.yaml   (postgres-expert)
+  order:
+    desc: "Order a Postgres: create Cluster {{.ORDER_NAME}} in the consumer workspace"
+    cmds: [ bash hack/order.sh ]
+
+  # owner script: test/e2e.sh   (test-verifier)
+  verify:
+    desc: "End-to-end proof: pod Ready in kind, status+Secret synced to kcp, live SELECT"
+    cmds: [ bash test/e2e.sh ]
+
+  # Convenience: show live state without touching anything (safe to run any time).
+  status:
+    desc: "Show live state: kcp process, kind cluster, CNPG + syncagent rollout"
+    cmds:
+      - |
+        echo "=== kcp ==="
+        pgrep -fl kcp 2>/dev/null | grep -v grep || echo "  (not running)"
+        echo ""
+        echo "=== kind cluster (${KIND_CLUSTER}) ==="
+        if kind get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER}"; then
+          kubectl --kubeconfig "${KIND_KUBECONFIG}" get nodes 2>/dev/null
+        else
+          echo "  (not running)"
+        fi
+        echo ""
+        echo "=== CloudNativePG ==="
+        kubectl --kubeconfig "${KIND_KUBECONFIG}" \
+          -n cnpg-system get deploy/cnpg-controller-manager 2>/dev/null || echo "  (not installed)"
+        echo ""
+        echo "=== api-syncagent ==="
+        # Helm chart sets app.kubernetes.io/name to the fullname (= release name kcp-api-syncagent).
+        kubectl --kubeconfig "${KIND_KUBECONFIG}" \
+          -n kcp-system get deploy -l app.kubernetes.io/name=kcp-api-syncagent 2>/dev/null || echo "  (not installed)"
+
+  up:
+    desc: "Stand up the whole stack (integration runner only)"
+    # Ordered: tools → kcp → kind → CNPG → syncagent (kubeconfig first, then Helm, then publish) → bind
+    # Each step is idempotent; re-running 'task up' after a partial failure is safe.
+    cmds:
+      - task: tools:check
+      - task: tools:kcp
+      - task: kcp:start
+      - task: kcp:workspaces
+      - task: kind:up
+      - task: cnpg:install
+      - task: syncagent:kubeconfig
+      - task: syncagent:install
+      - task: syncagent:publish
+      - task: provider:bind
+
+  down:
+    desc: "Tear everything down (integration runner only)"
+    # kcp first so the syncagent's reconciler stops before the kind cluster vanishes.
+    cmds:
+      - task: kcp:stop
+      - task: kind:down
