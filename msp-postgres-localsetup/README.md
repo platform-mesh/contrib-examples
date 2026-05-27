@@ -298,6 +298,16 @@ There are **no `kcp:*` targets** — kcp is cluster A's, not a host process.
   clean from-scratch stand-up on the fixed branch avoids it entirely. (This was the in-A `orchestrate`
   agent during the namespace-gap incident — unrelated to this example's agent in cluster B.)
 
+- **Postgres doesn't appear in the portal listing for an account** — the kubernetes-graphql-gateway
+  surfaces a workspace's APIs from its **APIBindings**, regenerating the account's GraphQL schema on
+  every bind event. The listener runs with `--anchor-resource=true` (the chart default), which matches
+  **all** bindings, so `clusters.postgresql.cnpg.io` surfaces automatically once the account's
+  APIBinding to `postgresql.cnpg.io` is `Bound`. **Load-bearing nuance:** do NOT "fix" the operator's
+  `anchorResource` key to a named value — that activates a `contains("platform-mesh.io")` filter which
+  would **exclude** `cnpg.io` and hide Postgres from the portal. The only precondition is the account
+  binding reaching `Bound` (verified live: the account auto-bind + `task bind` patch → Bound + 3 claims
+  + `clusters.postgresql.cnpg.io` served, and the gateway regenerated the account-ws schema).
+
 ---
 
 ## Documentation references
