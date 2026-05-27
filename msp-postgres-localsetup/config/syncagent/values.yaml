@@ -68,13 +68,16 @@ crds:
 
 # REQUIRED for cluster-B-pod -> cluster-A-kcp connectivity (see "WHY root.kcp.localhost" above).
 # root.kcp.localhost — the only SNI cluster A's Istio gateway routes — would otherwise resolve to
-# 127.0.0.1 inside the pod. This maps it to the kind docker-network host-gateway, which forwards to
-# the host where cluster A's gateway :8443 is published. The IP below is a PLACEHOLDER (the common
-# Docker Desktop value); the integrator MUST verify/override it at live bring-up (#7):
-#   docker network inspect kind -f '{{ (index .IPAM.Config 0).Gateway }}'   # often 172.18.0.1
+# 127.0.0.1 inside the pod. This maps it to the host-gateway where cluster A's :8443 is published.
+# On Docker Desktop that is host.docker.internal's in-node IPv4 (192.168.65.254 below — verified live).
+# hack/syncagent-install.sh RESOLVES this per host at install time and OVERRIDES the ip via --set:
+#   docker exec <KIND_CLUSTER>-control-plane getent ahostsv4 host.docker.internal
+# so the value below is just the documented fallback (used for a manual `helm install` without the
+# script). NB: the `kind` bridge gateway (172.18.0.1) does NOT work — A's :8443 is published on host
+# loopback, unreachable via the bridge interface.
 hostAliases:
   enabled: true
   values:
-    - ip: "172.18.0.1"
+    - ip: "192.168.65.254"
       hostnames:
         - root.kcp.localhost
