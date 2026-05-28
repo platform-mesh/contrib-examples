@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `platform-mesh/examples` — a collection of runnable **example MSPs** (managed services) for
 Platform Mesh (kcp). Each MSP is a self-contained example in its own top-level directory using the
-`msp-<service>/` naming convention; the first is **`msp-postgres/`**, which turns PostgreSQL into a
+`msp-<service>/` naming convention; the first is **`msp-postgres-kcp-only/`**, which turns PostgreSQL into a
 self-service, orderable database on a kcp control plane. Work happens inside a single example
 directory; **run every command from that directory.**
 
@@ -15,7 +15,7 @@ bash scripts (`hack/`) over YAML manifests (`config/`), with a bash end-to-end t
 No Go module, no Makefile. A new MSP follows the same layout in a new `msp-*/` directory, and the
 conventions below apply to all of them.
 
-## Commands (run from `msp-postgres/`)
+## Commands (run from `msp-postgres-kcp-only/`)
 
 ```sh
 task            # list all targets (default)
@@ -28,7 +28,7 @@ task status     # non-destructive snapshot of live state
 
 `task up` is a sequential, **idempotent** pipeline — re-running after a partial failure is safe.
 Individual steps (`task kcp:start`, `task syncagent:install`, …) run standalone; see the
-"Per-target reference" table in `msp-postgres/README.md`.
+"Per-target reference" table in `msp-postgres-kcp-only/README.md`.
 
 ### Validating edits without standing up the stack
 
@@ -42,7 +42,7 @@ process and **one** kind cluster, so concurrent live runs corrupt shared state.
 
 ## Architecture
 
-Read `msp-postgres/docs/architecture.md` (Mermaid flow) and `README.md` first. The essential model:
+Read `msp-postgres-kcp-only/docs/architecture.md` (Mermaid flow) and `README.md` first. The essential model:
 
 - **Two control planes.** kcp runs as a **local host binary** (pinned into `bin/`, state in `.kcp/`);
   the backing **kind** cluster runs in Docker and hosts the CloudNativePG (CNPG) operator and the

@@ -1,6 +1,6 @@
 # msp-postgres-localsetup — Postgres 15 MSP with the backing DB in a SECOND kind cluster
 
-A variant of [`../msp-postgres`](../msp-postgres) adapted for **Platform Mesh local-setup**. The
+A variant of [`../msp-postgres-kcp-only`](../msp-postgres-kcp-only) adapted for **Platform Mesh local-setup**. The
 control plane (kcp + portal) is the existing local-setup cluster; the **data plane** — CloudNativePG
 and the kcp **api-syncagent** — runs in a **separate** kind cluster that connects *outbound* to the
 local-setup kcp. Consumers order CloudNativePG's *native* `Cluster` API (passthrough, no custom
@@ -64,7 +64,7 @@ the agent's `hostAliases` (in `config/syncagent/values.yaml`) maps it to a host-
   `apiExportName` documents intent but is inert in the v0.6.0 chart. It MUST equal the APIExport
   provider-portal creates in cluster A's provider workspace, so kcp's auto-created default
   `APIExportEndpointSlice` carries the same name (that is what the agent follows). (Names are
-  arbitrary in kcp; passthrough works identically — the standalone `msp-postgres` uses `api-syncagent`.)
+  arbitrary in kcp; passthrough works identically — the standalone `msp-postgres-kcp-only` uses `api-syncagent`.)
 - **Account `APIBinding` must `Accept` all three auto-added permissionClaims** — `namespaces`,
   `secrets`, `events` — or the connection Secret never syncs back (silent-failure trap). That
   binding is owned by Workstream A (auto-added to every account via `extraDefaultAPIBindings`).

@@ -1,4 +1,4 @@
-# msp-postgres — PostgreSQL as an orderable service on Platform Mesh (kcp)
+# msp-postgres-kcp-only — PostgreSQL as an orderable service on Platform Mesh (kcp)
 
 This example turns **PostgreSQL into a self-service database** on a [kcp](https://kcp.io) control plane.
 A consumer creates a CloudNativePG `Cluster` object in their own kcp workspace; the [kcp api-syncagent](https://github.com/kcp-dev/api-syncagent) syncs it to a backing **kind** cluster where the **CloudNativePG** operator provisions a real PostgreSQL instance. Status and the generated connection `Secret` flow back to the consumer — no custom operator required. See [`docs/architecture.md`](docs/architecture.md) for the full Mermaid flow diagram.
