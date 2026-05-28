@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-`platform-mesh/examples` — a collection of runnable **example MSPs** (managed services) for
+`platform-mesh/contrib-examples` — a collection of runnable **example MSPs** (managed services) for
 Platform Mesh (kcp). Each MSP is a self-contained example in its own top-level directory using the
 `msp-<service>/` naming convention; the first is **`msp-postgres-kcp-only/`**, which turns PostgreSQL into a
 self-service, orderable database on a kcp control plane. Work happens inside a single example

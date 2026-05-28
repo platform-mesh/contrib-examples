@@ -1,4 +1,4 @@
-# platform-mesh/examples
+# platform-mesh/contrib-examples
 
 A collection of runnable **example MSPs** (managed services) for [Platform Mesh](https://github.com/platform-mesh) on
 [kcp](https://kcp.io). Each example turns a piece of off-the-shelf infrastructure into a self-service,
