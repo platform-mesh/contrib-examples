@@ -1,13 +1,9 @@
-# pinned tools (fetched by `task tools:kcp`)
-/bin/
+.worktrees/
 
-# local kcp state
-/.kcp/
-
-# exported kind kubeconfig
-/.kube/
-
-# temp kubeconfigs & generated artifacts
-*.tmp.kubeconfig
-*.tmp.yaml
-/tmp/
+# Runtime state — created by `task up` (not source).
+# `.kcp/`  : host-binary kcp's data dir (admin kubeconfig, etcd, certs, PID, log).
+# `.kube/` : kind cluster's kubeconfig (`kind.kubeconfig`).
+# `bin/`   : downloaded kcp / kubectl-kcp / kubectl-ws binaries.
+.kcp/
+.kube/
+bin/

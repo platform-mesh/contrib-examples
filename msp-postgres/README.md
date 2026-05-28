@@ -7,6 +7,40 @@ A consumer creates a CloudNativePG `Cluster` object in their own kcp workspace; 
 
 ---
 
+## Topology — where each piece runs
+
+In this example **kcp runs locally as a process on your host (macOS) — it is _not_ deployed inside
+the kind cluster.** kcp is the *control plane* you order from; the kind cluster is the *service
+cluster* where the operator and the actual databases run. They are separate processes/containers,
+and the api-syncagent (running **inside** kind) dials **out** to kcp on the host.
+
+```text
+HOST (macOS)                               DOCKER — one kind container
+┌───────────────────────────────┐        ┌─────────────────────────────────────┐
+│ kcp  (control plane)           │        │ kind  "service cluster"             │
+│  • bin/kcp start (local proc)  │        │  • CloudNativePG operator           │
+│  • state in ./.kcp/ (etcd)     │◄──────►│  • api-syncagent  ─ dials out ─────►│
+│  • workspaces, APIExport       │ :6443  │  • Postgres pods + PVCs             │
+│  • listens on 0.0.0.0:6443     │        │                                     │
+└───────────────────────────────┘        └─────────────────────────────────────┘
+   advertises host.docker.internal:6443   ◄─ the in-kind agent reaches kcp here
+```
+
+Because the agent (container) and kcp (host) are in different network namespaces, `kcp:start`
+launches kcp with `--bind-address=0.0.0.0 --shard-base-url=https://host.docker.internal:6443`, so
+the serving-cert SAN **and** the `APIExportEndpointSlice` virtual-workspace URL use a hostname the
+container can reach (`host.docker.internal`, injected by Docker Desktop). The host-side
+`admin.kubeconfig` is rewritten to `127.0.0.1:6443` for local CLI use.
+
+> **Local vs. hosted kcp.** Running kcp locally is a convenience for this single-machine demo. The
+> api-syncagent is explicitly designed to connect to a **remote** kcp, so in a real Platform Mesh
+> deployment kcp is a hosted/clustered control plane and only the api-syncagent + operator +
+> databases live in the service cluster. Pointing this example at a hosted kcp (instead of the local
+> `bin/kcp`) needs no change to the publish / order / bind flow — only the kcp endpoint and
+> kubeconfig differ.
+
+---
+
 ## Prerequisites
 
 | Tool | Notes |
@@ -109,9 +143,9 @@ task status   # non-destructive: shows kcp PID, kind nodes, CNPG deploy, syncage
 
 ### kcp ↔ kind connectivity
 
-**The main risk in this setup** is that kcp must serve URLs reachable from _inside_ kind pods (where the api-syncagent runs).
+**The main risk in this setup** is that kcp (a **local host process** — see [Topology](#topology--where-each-piece-runs)) must serve URLs reachable from _inside_ kind pods (where the api-syncagent runs).
 
-**Approach used here:** kcp binds on `host.docker.internal` (Docker Desktop injects this hostname into every container automatically — see `config/kind/cluster.yaml`). The syncagent kubeconfig therefore points at `https://host.docker.internal:<kcp-port>` and the pod can resolve it without any extra networking config.
+**Approach used here:** kcp binds `0.0.0.0` and **advertises** `host.docker.internal` (via `--shard-base-url`); Docker Desktop injects that hostname into every container, so the in-kind agent reaches the host. The syncagent kubeconfig points at `https://host.docker.internal:<kcp-port>` with `insecure-skip-tls-verify`.
 
 If you see `dial tcp: lookup host.docker.internal: no such host` in the syncagent logs:
 - Ensure you are using Docker Desktop (not plain `dockerd` / colima without the compat layer).
