@@ -1,5 +1,12 @@
 # platform-mesh/contrib-examples
 
+> [!WARNING]
+> **Work in progress — example code only.** This is an examples repository
+> associated with Platform Mesh. The code here is **not** officially maintained,
+> has no support or backwards-compatibility guarantees, and is **not** part of
+> the Platform Mesh release process. Use the examples as starting points, not
+> as production references.
+
 A collection of runnable **example MSPs** (managed services) for [Platform Mesh](https://github.com/platform-mesh) on
 [kcp](https://kcp.io). Each example turns a piece of off-the-shelf infrastructure into a self-service,
 orderable API on a kcp control plane — using the [api-syncagent](https://github.com/kcp-dev/api-syncagent)
