@@ -1,0 +1,29 @@
+# config/provider/rbac.yaml — owner: kcp-expert
+#
+# Allow account workspaces to BIND the `postgresql.cnpg.io` APIExport without explicit per-account
+# permission. Mirrors provider-quickstart/config/provider/rbac.yaml: the Platform Mesh operator's
+# extraDefaultAPIBindings injects a binding to this export into every account workspace, and that
+# bind operation runs as system:anonymous in this local-setup. Without this, the auto-binding fails
+# and `clusters.postgresql.cnpg.io` is never served in the account.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: postgresql-cnpg-io-apiexport-bind
+rules:
+  - apiGroups: ["apis.kcp.io"]
+    resources: ["apiexports"]
+    verbs: ["bind"]
+    resourceNames: ["postgresql.cnpg.io"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: postgresql-cnpg-io-anonymous-bind
+subjects:
+  - kind: User
+    name: system:anonymous
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: postgresql-cnpg-io-apiexport-bind
+  apiGroup: rbac.authorization.k8s.io
