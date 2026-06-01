@@ -18,7 +18,7 @@
 # cluster A's $PROVIDER_WS workspace.
 #
 # SHARED-STATE / SAFETY: live bring-up touches cluster A's kcp (shared by the whole local-setup)
-# AND the backing kind cluster. `order`/`verify` run `kubectl ws` against $KCP_KUBECONFIG, which
+# AND the backing kind cluster. `order`/`verify` run `kubectl ws` against $PM_KUBECONFIG, which
 # rewrites that kubeconfig's current-context server to the target workspace (standard kcp
 # navigation; revert with `kubectl ws :root`). Only the integration runner executes the live
 # targets. Experts author + self-validate scripts/manifests (shellcheck, yamllint, helm template,
@@ -35,11 +35,13 @@ vars:
   KIND_CONTEXT: kind-msp-postgres-backing
   AGENT_NAME: msp-postgres-backing
   # Provider workspace in cluster A that holds the APIExport `postgresql.cnpg.io`.
-  PROVIDER_WS: 'root:providers:postgres-provider'
+  # `kubectl ws` requires a leading ':' for absolute paths (kcp >= 0.31); scripts also normalize
+  # bare-'root:...' values into ':root:...' so either form works on the CLI.
+  PROVIDER_WS: ':root:providers:postgres-provider'
   # Consumer (account) workspace in cluster A that has the auto-added APIBinding to
   # postgresql.cnpg.io. PLACEHOLDER — the integrator MUST override this to the real account path,
-  # e.g.  task order CONSUMER_WS=root:orgs:<org>:<account>
-  CONSUMER_WS: 'root:orgs:REPLACE-WITH-ACCOUNT'
+  # e.g.  task order CONSUMER_WS=:root:orgs:<org>:<account>
+  CONSUMER_WS: ':root:orgs:REPLACE-WITH-ACCOUNT'
   ORDER_NAME: pg-demo
   ORDER_NS: default
   # Hostname the backing-cluster agent uses to reach cluster A's kcp. MUST be root.kcp.localhost:
@@ -49,17 +51,17 @@ vars:
   # config/syncagent/values.yaml (it would otherwise resolve to 127.0.0.1 = the pod itself).
   KCP_EXTERNAL_HOST: root.kcp.localhost
   KCP_PORT: "8443"
-  # Cluster A's admin kubeconfig (minted by the local-setup start.sh). Absolute path; override if
-  # your helm-charts checkout lives elsewhere.
-  KCP_KUBECONFIG: /Users/I073426/SAPDevelop/kow/platform-mesh/helm-charts/.secret/kcp/admin.kubeconfig
+  # Cluster A's admin kubeconfig. Reads $PM_KUBECONFIG, else falls back to
+  # ./kcp-admin.kubeconfig in this directory. See README §"Point at cluster A".
+  PM_KUBECONFIG: '{{.PM_KUBECONFIG | default (printf "%s/kcp-admin.kubeconfig" .TASKFILE_DIR)}}'
 
 # Exported to every hack/ script. Scripts read these — do not hardcode values in scripts.
 # KUBECONFIG defaults to cluster A's kcp admin kubeconfig (kcp ops use it or --kubeconfig
-# "$KCP_KUBECONFIG"); BACKING-CLUSTER ops MUST be explicit: kubectl --kubeconfig "$KIND_KUBECONFIG".
+# "$PM_KUBECONFIG"); BACKING-CLUSTER ops MUST be explicit: kubectl --kubeconfig "$KIND_KUBECONFIG".
 env:
-  KUBECONFIG: '{{.KCP_KUBECONFIG}}'
+  KUBECONFIG: '{{.PM_KUBECONFIG}}'
   TASKFILE_DIR: '{{.TASKFILE_DIR}}'
-  KCP_KUBECONFIG: '{{.KCP_KUBECONFIG}}'
+  PM_KUBECONFIG: '{{.PM_KUBECONFIG}}'
   KIND_KUBECONFIG: '{{.TASKFILE_DIR}}/.kube/kind.kubeconfig'
   SYNCAGENT_VERSION: '{{.SYNCAGENT_VERSION}}'
   CNPG_VERSION: '{{.CNPG_VERSION}}'
@@ -127,8 +129,8 @@ tasks:
     desc: "Show live state: cluster-A kubeconfig presence, backing kind cluster, CNPG + syncagent rollout"
     cmds:
       - |
-        echo "=== cluster A kcp kubeconfig ($KCP_KUBECONFIG) ==="
-        if [ -s "$KCP_KUBECONFIG" ]; then echo "  present"; else echo "  (missing — cluster A not stood up yet)"; fi
+        echo "=== cluster A kcp kubeconfig ($PM_KUBECONFIG) ==="
+        if [ -s "$PM_KUBECONFIG" ]; then echo "  present"; else echo "  (missing — cluster A not stood up yet)"; fi
         echo ""
         echo "=== backing kind cluster ($KIND_CLUSTER) ==="
         if kind get clusters 2>/dev/null | grep -qx "$KIND_CLUSTER"; then

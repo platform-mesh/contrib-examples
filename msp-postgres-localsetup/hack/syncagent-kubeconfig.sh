@@ -5,7 +5,7 @@
 # CLUSTER A's kcp, and store it as a Secret on the backing cluster. Idempotent.
 #
 # What it does:
-#   1. Copies cluster A's admin kubeconfig ($KCP_KUBECONFIG) and navigates the COPY to the provider
+#   1. Copies cluster A's admin kubeconfig ($PM_KUBECONFIG) and navigates the COPY to the provider
 #      workspace ($PROVIDER_WS) with `kubectl ws` (does not disturb the shared admin kubeconfig).
 #   2. Minifies+flattens it to a single self-contained cluster/context/user.
 #   3. Rewrites the server to https://$KCP_EXTERNAL_HOST:$KCP_PORT/<path> (path preserved) and sets
@@ -16,10 +16,10 @@
 #   4. Stores it on the backing cluster as Secret `kcp-kubeconfig` (key `kubeconfig`) in ns kcp-system.
 #
 # Reads env vars exported by Taskfile.yml; do NOT hardcode paths/hosts/workspaces:
-#   KCP_KUBECONFIG, KIND_KUBECONFIG, PROVIDER_WS, KCP_EXTERNAL_HOST, KCP_PORT
+#   PM_KUBECONFIG, KIND_KUBECONFIG, PROVIDER_WS, KCP_EXTERNAL_HOST, KCP_PORT
 #
 # !! RUNTIME DEPENDENCY ON CLUSTER A — run this only AFTER cluster A is up !!
-# $KCP_KUBECONFIG points at the Platform Mesh local-setup admin kubeconfig
+# $PM_KUBECONFIG points at the Platform Mesh local-setup admin kubeconfig
 # (helm-charts/.secret/kcp/admin.kubeconfig). That file is minted by cluster A's start.sh, and the
 # provider workspace ($PROVIDER_WS) is created by the provider-portal workstream. So this script
 # cannot succeed until the integrator has stood up cluster A (and applied the postgres-provider
@@ -33,14 +33,17 @@
 # has a TLSRoute; insecure-skip-tls-verify still sends SNI from the URL host. The agent Pod resolves
 # root.kcp.localhost via the hostAliases block in config/syncagent/values.yaml (it would otherwise
 # resolve to 127.0.0.1 = the pod). The A-side advertise/SNI setup is owned by provider-portal/integrator.
-# Also: the admin kubeconfig at $KCP_KUBECONFIG must be reachable from THIS host (where `kubectl ws`
+# Also: the admin kubeconfig at $PM_KUBECONFIG must be reachable from THIS host (where `kubectl ws`
 # runs) — cluster A's gateway on 127.0.0.1:$KCP_PORT, where root.kcp.localhost resolves to loopback.
 # The rewrite below pins the agent's copy to root.kcp.localhost + insecure-skip-tls-verify.
 set -euo pipefail
 
-: "${KCP_KUBECONFIG:?KCP_KUBECONFIG must be set}"
+: "${PM_KUBECONFIG:?PM_KUBECONFIG must be set}"
 : "${KIND_KUBECONFIG:?KIND_KUBECONFIG must be set}"
 : "${PROVIDER_WS:?PROVIDER_WS must be set}"
+# kcp >= 0.31's `kubectl ws` requires a leading ':' for absolute paths. Accept both 'root:...'
+# and ':root:...' forms by normalizing to exactly one leading colon.
+PROVIDER_WS=":${PROVIDER_WS#:}"
 : "${KCP_EXTERNAL_HOST:?KCP_EXTERNAL_HOST must be set}"
 : "${TASKFILE_DIR:?TASKFILE_DIR must be set}"
 # KCP_PORT is optional: when set (Taskfile exports 8443) it pins the rewritten server port; when
@@ -48,10 +51,9 @@ set -euo pipefail
 KCP_PORT="${KCP_PORT:-}"
 
 # Fail early & clearly if cluster A's admin kubeconfig is not present yet.
-if [[ ! -s "${KCP_KUBECONFIG}" ]]; then
-  echo "ERROR: cluster A admin kubeconfig not found at ${KCP_KUBECONFIG}" >&2
-  echo "       Stand up the Platform Mesh local-setup (cluster A) on the feat/msp-postgres-localsetup" >&2
-  echo "       branch first, then re-run 'task syncagent:kubeconfig'." >&2
+if [[ ! -s "${PM_KUBECONFIG}" ]]; then
+  echo "ERROR: cluster A admin kubeconfig not found at ${PM_KUBECONFIG}" >&2
+  echo "       See README §\"Point at cluster A\"." >&2
   exit 1
 fi
 
@@ -65,7 +67,7 @@ cleanup() { rm -f "${SNAP}" "${AGENT_KC}" "${AGENT_KC}.tmp"; }
 trap cleanup EXIT
 
 echo "==> Snapshotting kcp kubeconfig and entering provider workspace: ${PROVIDER_WS}"
-cp "${KCP_KUBECONFIG}" "${SNAP}"
+cp "${PM_KUBECONFIG}" "${SNAP}"
 KUBECONFIG="${SNAP}" kubectl ws "${PROVIDER_WS}"
 
 # Reduce to just the current (provider-ws) context, with certs/tokens embedded inline.

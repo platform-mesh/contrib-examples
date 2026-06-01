@@ -1,0 +1,127 @@
+# config/provider/contentconfiguration.yaml — owner: portal-expert
+#
+# Adds a "PostgreSQL" entry to the account-scoped Platform Mesh portal nav for accounts that have
+# bound the `postgresql.cnpg.io` APIExport. Uses the DEFAULT PM portal's built-in web component
+# `generic-list-view` / `generic-detail-view` (no separate portal service needed) — the same
+# pattern as the helm-charts `httpbin-provider` example. To swap in a custom UI later, replace
+# the node's `url` and drop the `webcomponent` block (see provider-quickstart for that variant).
+#
+# `metadata.labels.ui.platform-mesh.io/content-for` MUST equal the APIExport name.
+apiVersion: ui.platform-mesh.io/v1alpha1
+kind: ContentConfiguration
+metadata:
+  name: postgresql-cnpg-io-ui
+  labels:
+    ui.platform-mesh.io/entity: core_platform-mesh_io_account
+    ui.platform-mesh.io/content-for: postgresql.cnpg.io
+spec:
+  inlineConfiguration:
+    contentType: json
+    # The portal renders the Cluster API via its generic list/detail views, driven by the
+    # `resourceDefinition` block below. GraphQL identifiers are the kcp/PM-conventional
+    # underscored form of the API group (postgresql.cnpg.io -> postgresql_cnpg_io).
+    content: |-
+      {
+        "name": "postgres-clusters",
+        "luigiConfigFragment": {
+          "data": {
+            "nodes": [
+              {
+                "pathSegment": "postgresql_cnpg_io_clusters",
+                "navigationContext": "postgresql_cnpg_io_clusters",
+                "label": "PostgreSQL",
+                "icon": "database",
+                "order": 850,
+                "entityType": "main.core_platform-mesh_io_account",
+                "keepSelectedForChildren": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                "webcomponent": { "selfRegistered": true },
+                "context": {
+                  "resourceDefinition": {
+                    "apiGroup": "postgresql_cnpg_io",
+                    "version": "v1",
+                    "entity": "Cluster",
+                    "entityCollection": "Clusters",
+                    "scope": "Namespaced",
+                    "namespace": null,
+                    "readyCondition": {
+                      "jsonPathExpression": "status.phase",
+                      "property": ["status.phase"]
+                    },
+                    "ui": {
+                      "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMzM2NzkxIi8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiBmb250LXNpemU9IjcwIiBmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+UEc8L3RleHQ+PC9zdmc+",
+                      "listView": {
+                        "fields": [
+                          { "label": "Name",      "property": "metadata.name" },
+                          { "label": "Namespace", "property": "metadata.namespace" },
+                          { "label": "Instances", "property": "spec.instances" },
+                          { "label": "Phase",     "property": "status.phase" },
+                          { "label": "Ready",     "property": "status.readyInstances" }
+                        ]
+                      },
+                      "detailView": {
+                        "fields": [
+                          { "label": "Name",            "property": "metadata.name" },
+                          { "label": "Namespace",       "property": "metadata.namespace" },
+                          { "label": "PostgreSQL UID",  "property": "metadata.uid" },
+                          { "label": "Instances",       "property": "spec.instances" },
+                          { "label": "Storage",         "property": "spec.storage.size" },
+                          { "label": "Phase",           "property": "status.phase" },
+                          { "label": "Ready instances", "property": "status.readyInstances" },
+                          { "label": "Current primary", "property": "status.currentPrimary" }
+                        ]
+                      },
+                      "createView": {
+                        "fields": [
+                          { "label": "Name",          "property": "metadata.name",                 "required": true },
+                          { "label": "Namespace",     "property": "metadata.namespace",            "required": true, "values": ["default"] },
+                          { "label": "Instances",     "property": "spec.instances",                "required": true, "values": [1] },
+                          { "label": "Image",         "property": "spec.imageName",                "required": true, "values": ["ghcr.io/cloudnative-pg/postgresql:15"] },
+                          { "label": "Storage size",  "property": "spec.storage.size",             "required": true, "values": ["1Gi"] },
+                          { "label": "Database name", "property": "spec.bootstrap.initdb.database","required": true },
+                          { "label": "Database owner","property": "spec.bootstrap.initdb.owner",   "required": true }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "children": [
+                  {
+                    "pathSegment": ":clusterId",
+                    "hideFromNav": true,
+                    "keepSelectedForChildren": false,
+                    "defineEntity": {
+                      "id": "postgresql_cnpg_io_cluster",
+                      "contextKey": "clusterId",
+                      "graphqlEntity": {
+                        "group": "postgresql_cnpg_io",
+                        "version": "v1",
+                        "kind": "Cluster",
+                        "query": "{ metadata { name namespace } }"
+                      }
+                    },
+                    "context": {
+                      "accountId": ":accountId",
+                      "clusterId": ":clusterId",
+                      "resourceId": ":clusterId"
+                    }
+                  }
+                ]
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.postgresql_cnpg_io_cluster",
+                "pathSegment": "dashboard",
+                "label": "Dashboard",
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
+              }
+            ],
+            "texts": [
+              { "locale": "",   "textDictionary": { "postgres-clusters": "PostgreSQL" } },
+              { "locale": "en", "textDictionary": { "postgres-clusters": "PostgreSQL" } }
+            ]
+          }
+        }
+      }

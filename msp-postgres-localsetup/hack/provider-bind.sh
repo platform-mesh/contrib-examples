@@ -23,13 +23,13 @@
 # `kubectl ws` plugin (which rejects --kubeconfig and would mutate the shared admin kubeconfig).
 #
 # Reads env exported by Taskfile.yml; do NOT hardcode paths/hosts/workspaces:
-#   KCP_KUBECONFIG, CONSUMER_WS, KCP_EXTERNAL_HOST, KCP_PORT, TASKFILE_DIR
+#   PM_KUBECONFIG, CONSUMER_WS, KCP_EXTERNAL_HOST, KCP_PORT, TASKFILE_DIR
 #
 # Several helpers are invoked indirectly; shellcheck's "never invoked" check is not relevant here.
 # shellcheck disable=SC2329
 set -euo pipefail
 
-: "${KCP_KUBECONFIG:?KCP_KUBECONFIG must be set}"
+: "${PM_KUBECONFIG:?PM_KUBECONFIG must be set}"
 : "${CONSUMER_WS:?CONSUMER_WS must be set}"
 : "${KCP_EXTERNAL_HOST:?KCP_EXTERNAL_HOST must be set}"
 : "${KCP_PORT:?KCP_PORT must be set}"
@@ -38,7 +38,8 @@ set -euo pipefail
 EXPORT_NAME="postgresql.cnpg.io"
 CNPG_RESOURCE="clusters.postgresql.cnpg.io"
 MANIFEST="${TASKFILE_DIR}/config/kcp/apibinding.yaml"
-SERVER="https://${KCP_EXTERNAL_HOST}:${KCP_PORT}/clusters/${CONSUMER_WS}"
+# /clusters/<path> uses the bare 'root:foo:bar' form — strip any leading ':' a caller may pass.
+SERVER="https://${KCP_EXTERNAL_HOST}:${KCP_PORT}/clusters/${CONSUMER_WS#:}"
 
 # permissionClaims payloads — v1alpha1 (all:true) and v1alpha2 (selector.matchAll:true). A merge
 # patch replaces the whole array, which is correct: the operator's auto-binding starts with none.
@@ -48,14 +49,14 @@ CLAIMS_V1A2='{"spec":{"permissionClaims":[{"group":"","resource":"namespaces","s
 say() { printf 'provider-bind: %s\n' "$*"; }
 die() { printf 'provider-bind: ERROR — %s\n' "$*" >&2; exit 1; }
 
-[ -s "${KCP_KUBECONFIG}" ] || die "cluster A admin kubeconfig not found at ${KCP_KUBECONFIG} — stand up cluster A first"
+[ -s "${PM_KUBECONFIG}" ] || die "cluster A admin kubeconfig not found at ${PM_KUBECONFIG} — see README §\"Point at cluster A\""
 [ -f "${MANIFEST}" ] || die "missing ${MANIFEST}"
 case "${CONSUMER_WS}" in
   *REPLACE-WITH-ACCOUNT*) die "CONSUMER_WS is still the placeholder — set it, e.g. task bind CONSUMER_WS=root:orgs:<org>:<account>" ;;
 esac
 
 # kubectl against $CONSUMER_WS on cluster A: admin auth+CA from the kubeconfig, endpoint overridden.
-kc() { kubectl --kubeconfig "${KCP_KUBECONFIG}" --server "${SERVER}" "$@"; }
+kc() { kubectl --kubeconfig "${PM_KUBECONFIG}" --server "${SERVER}" "$@"; }
 
 # Name of any APIBinding in $CONSUMER_WS that references our export (kcp owns the name; discover it).
 find_binding() {
