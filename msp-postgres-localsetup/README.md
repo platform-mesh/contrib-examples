@@ -49,7 +49,38 @@ kubectl --context kind-platform-mesh -n platform-mesh-system get platformmesh
 # READY=True
 ```
 
-## 2. Stand up Cluster B (data plane)
+## 2. Point at cluster A
+
+```sh
+cp ../../helm-charts/.secret/kcp/admin.kubeconfig kcp-admin.kubeconfig
+export PM_KUBECONFIG="$(realpath kcp-admin.kubeconfig)"
+
+KUBECONFIG=$PM_KUBECONFIG kubectl create-workspace postgres-provider \
+  --type=root:provider --ignore-existing \
+  --server=https://localhost:8443/clusters/root:providers
+
+KUBECONFIG=$PM_KUBECONFIG kubectl apply \
+  --server=https://localhost:8443/clusters/root:providers:postgres-provider \
+  -f config/kcp/apiexport.yaml
+
+KUBECONFIG=$PM_KUBECONFIG kubectl apply \
+  --server=https://localhost:8443/clusters/root:providers:postgres-provider \
+  -k config/provider
+```
+
+The api-syncagent v0.6.0 doesn't create the `APIExport` itself — it resolves
+an existing one (or refuses to start). The empty `APIExport` above gets filled
+in with resource schemas and permission claims when `task syncagent:publish`
+applies the `PublishedResource` on cluster B.
+
+[`config/provider`](config/provider) is the portal-side bootstrap:
+`ProviderMetadata` (listing entry — name, description, icon, contacts),
+`ContentConfiguration` (adds a "PostgreSQL" nav node that renders
+`clusters.postgresql.cnpg.io` via the default portal's `generic-list-view` web
+component — no custom portal service), and RBAC that lets account workspaces
+auto-bind the export.
+
+## 3. Stand up Cluster B (data plane)
 
 From this directory:
 
@@ -59,21 +90,21 @@ task kind:up cnpg:install syncagent:kubeconfig syncagent:install syncagent:publi
 
 Each step is idempotent — safe to re-run if anything hiccups.
 
-## 3. Create a consumer workspace and order a database
+## 4. Create a consumer workspace and order a database
 
 ```sh
-KUBECONFIG=<helm-charts>/.secret/kcp/admin.kubeconfig \
+KUBECONFIG="${PM_KUBECONFIG:-kcp-admin.kubeconfig}" \
   kubectl create-workspace consumer-pg --ignore-existing \
   --server=https://localhost:8443/clusters/root
 
-task bind   CONSUMER_WS=root:consumer-pg
-task order  CONSUMER_WS=root:consumer-pg
+task bind   CONSUMER_WS=:root:consumer-pg
+task order  CONSUMER_WS=:root:consumer-pg
 ```
 
-## 4. Verify
+## 5. Ver
 
 ```sh
-task verify CONSUMER_WS=root:consumer-pg
+task verify CONSUMER_WS=:root:consumer-pg
 ```
 
 Expected: **`✅ E2E PASS`**. Your `Cluster` was synced to B, CloudNativePG
@@ -81,7 +112,7 @@ provisioned a real Postgres 15 pod, status and the connection `Secret` synced
 back to your consumer workspace byte-identical, and a live `SELECT version();`
 returned `PostgreSQL 15.x`.
 
-## 5. Clean up
+## 6. Clean up
 
 ```sh
 task down                                  # delete cluster B

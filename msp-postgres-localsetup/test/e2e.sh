@@ -27,9 +27,12 @@
 set -euo pipefail
 
 # --- contract: env vars exported by Taskfile.yml (with fallbacks for standalone runs) ---
-KCP_KUBECONFIG="${KCP_KUBECONFIG:?KCP_KUBECONFIG must be set}"
+PM_KUBECONFIG="${PM_KUBECONFIG:?PM_KUBECONFIG must be set}"
 KIND_KUBECONFIG="${KIND_KUBECONFIG:?KIND_KUBECONFIG must be set}"
-CONSUMER_WS="${CONSUMER_WS:-root:msp:customer-a}"
+CONSUMER_WS="${CONSUMER_WS:-:root:msp:customer-a}"
+# kcp >= 0.31's `kubectl ws` requires a leading ':' for absolute paths. Normalize so both
+# 'root:...' (legacy) and ':root:...' overrides work.
+CONSUMER_WS=":${CONSUMER_WS#:}"
 ORDER_NAME="${ORDER_NAME:-pg-demo}"
 ORDER_NS="${ORDER_NS:-default}"          # namespace of the ordered Cluster in the consumer ws
 APP_SECRET="${ORDER_NAME}-app"            # CNPG connection Secret name on the kcp/consumer side
@@ -39,11 +42,11 @@ AGENT_NAME="${AGENT_NAME:-msp-postgres}"  # api-syncagent agentName (config/sync
 SYNC_SELECTOR="syncagent.kcp.io/agent-name=${AGENT_NAME}"  # marks objects THIS agent synced (kind side)
 
 # kubectl wrappers — keep the two control planes unambiguous.
-kc() { kubectl --kubeconfig "$KCP_KUBECONFIG" "$@"; }   # kcp operations
+kc() { kubectl --kubeconfig "$PM_KUBECONFIG" "$@"; }   # kcp operations
 kk() { kubectl --kubeconfig "$KIND_KUBECONFIG" "$@"; }  # kind operations
 # `kubectl ws` is a plugin: flags must come AFTER the plugin name, so pass the kubeconfig via
 # the env var rather than `--kubeconfig` (which kubectl rejects before a plugin name).
-kcws() { KUBECONFIG="$KCP_KUBECONFIG" kubectl ws "$@"; }
+kcws() { KUBECONFIG="$PM_KUBECONFIG" kubectl ws "$@"; }
 
 # --- output helpers (checks never abort; we accumulate and summarize at the end) ---
 PASS_COUNT=0
@@ -77,7 +80,7 @@ echo "######################################################################"
 echo "# msp-postgres end-to-end verification"
 echo "#   consumer ws : $CONSUMER_WS"
 echo "#   order       : $ORDER_NAME (ns $ORDER_NS)"
-echo "#   kcp kubecfg : $KCP_KUBECONFIG"
+echo "#   kcp kubecfg : $PM_KUBECONFIG"
 echo "#   kind kubecfg: $KIND_KUBECONFIG"
 echo "######################################################################"
 
