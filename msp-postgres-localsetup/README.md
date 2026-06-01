@@ -101,7 +101,7 @@ task bind   CONSUMER_WS=:root:consumer-pg
 task order  CONSUMER_WS=:root:consumer-pg
 ```
 
-## 5. Ver
+## 5. Verify
 
 ```sh
 task verify CONSUMER_WS=:root:consumer-pg
