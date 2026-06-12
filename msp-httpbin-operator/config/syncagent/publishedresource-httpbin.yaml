@@ -1,0 +1,28 @@
+# config/syncagent/publishedresource-httpbin.yaml — owner: syncagent-expert
+# Applied on the KIND cluster (CRD installed by the api-syncagent Helm chart). It tells the agent
+# to publish the httpbin-operator's native HttpBin API into kcp — the agent generates an APIResourceSchema
+# from the CRD and adds it to the APIExport `api-syncagent` in the provider workspace.
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: httpbins
+spec:
+  resource:
+    apiGroup: orchestrate.platform-mesh.io
+    kind: HttpBin
+    # `versions: [v1alpha1]` is the v0.6.0 non-deprecated form of the requested `version: v1alpha1`
+    # (the singular `.spec.resource.version` field is deprecated in the PublishedResource CRD).
+    versions:
+      - v1alpha1
+
+  # !! GOAL-1 SINGLE-CONSUMER SIMPLIFICATION — MUST BE REMOVED FOR GOAL 2 !!
+  # This `naming` block preserves the consumer's name + namespace on the service cluster instead of
+  # the agent's DEFAULT anti-collision hashing. It makes the on-kind objects predictable — HttpBin
+  # `httpbin-demo` in ns `default` — matching what you see in the consumer workspace.
+  # It is SAFE ONLY because goal 1 is single-consumer / single-order. For the multi-consumer goal 2,
+  # DELETE this entire `naming` block to restore the default hashing — otherwise two consumers that
+  # order the same name/namespace would COLLIDE on kind (the default hashing exists precisely to
+  # prevent that).
+  naming:
+    name: "{{ .Object.metadata.name }}"
+    namespace: "{{ .Object.metadata.namespace }}"
