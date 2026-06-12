@@ -1,0 +1,143 @@
+# Taskfile for the MongoDB MSP example (Platform Mesh / kcp + custom multiclusterruntime syncher + MongoDB Community Operator).
+#
+# DESIGN: this file is a THIN ORCHESTRATOR. Each target calls one script in hack/ owned by one
+# expert, so multiple agents never edit this file. Owner of THIS file: `developer` (pipeline
+# ordering, vars/env contract, idempotency, UX). Owners of the hack/ scripts + config/ manifests
+# are noted per target.
+#
+# NOTE: This example is DIFFERENT from msp-postgres-kcp-only and msp-httpbin-operator:
+#   - kcp runs INSIDE the kind cluster (not as a host process)
+#   - Uses a CUSTOM syncher (multiclusterruntime) instead of api-syncagent
+#   - The syncher is specific to the MongoDB CRD
+#
+# Pinned, mutually-compatible versions (do not bump without coordinating):
+#   kcp v0.26.0 (in-cluster)  +  MongoDB Community Operator v0.13.0  +  syncher sha-81430d4
+#
+# SHARED-STATE RULE: live bring-up touches ONE kind cluster + stateful kubeconfigs.
+# Only the integration runner (test-verifier / lead) executes up/order/verify/down.
+#
+# Every hack/ script runs under `set -euo pipefail` and reads the env vars exported below.
+
+version: '3'
+
+vars:
+  MONGODB_OPERATOR_VERSION: "0.13.0"
+  SYNCHER_IMAGE: "ghcr.io/platform-mesh/example-mongodb-multiclusterruntime:sha-81430d4"
+  KIND_CLUSTER: msp-mongodb
+  KIND_CONTEXT: kind-msp-mongodb
+  KCP_HOSTNAME: kcp.localhost           # *.localhost resolves to 127.0.0.1 per RFC 6761 — no /etc/hosts needed
+  KCP_EXTERNAL_PORT: "8443"
+  PROVIDER_WS: 'root:mongodb'
+  CONSUMER_WS: 'root:consumer'
+  ORDER_NAME: example-mongodb
+  ORDER_NS: mongodb
+
+# Exported to every hack/ script. Scripts read these — do not hardcode values in scripts.
+env:
+  TASKFILE_DIR: '{{.TASKFILE_DIR}}'
+  KIND_KUBECONFIG: '{{.TASKFILE_DIR}}/.kube/kind.kubeconfig'
+  KCP_ADMIN_KUBECONFIG: '{{.TASKFILE_DIR}}/.kcp/admin.kubeconfig'
+  KCP_CONTROLLER_KUBECONFIG: '{{.TASKFILE_DIR}}/.kcp/controller.kubeconfig'
+  MONGODB_OPERATOR_VERSION: '{{.MONGODB_OPERATOR_VERSION}}'
+  SYNCHER_IMAGE: '{{.SYNCHER_IMAGE}}'
+  KIND_CLUSTER: '{{.KIND_CLUSTER}}'
+  KIND_CONTEXT: '{{.KIND_CONTEXT}}'
+  KCP_HOSTNAME: '{{.KCP_HOSTNAME}}'
+  KCP_EXTERNAL_PORT: '{{.KCP_EXTERNAL_PORT}}'
+  PROVIDER_WS: '{{.PROVIDER_WS}}'
+  CONSUMER_WS: '{{.CONSUMER_WS}}'
+  ORDER_NAME: '{{.ORDER_NAME}}'
+  ORDER_NS: '{{.ORDER_NS}}'
+
+tasks:
+  default:
+    cmds: [ task --list ]
+    silent: true
+
+  # owner script: hack/tools-check.sh   (k8s-expert)
+  tools:check:
+    desc: "Verify required CLIs (kubectl, kind, docker, helm) and print versions"
+    cmds: [ bash hack/tools-check.sh ]
+
+  # owner script: hack/kind-up.sh + config/kind/   (k8s-expert)
+  kind:up:
+    desc: "Create the kind cluster {{.KIND_CLUSTER}} with kcp pre-installed"
+    cmds: [ bash hack/kind-up.sh ]
+  kind:down:
+    desc: "Delete the kind cluster {{.KIND_CLUSTER}}"
+    cmds: [ bash hack/kind-down.sh ]
+
+  # owner script: hack/kcp-setup.sh + config/kcp/*.yaml   (kcp-expert)
+  kcp:setup:
+    desc: "Wait for kcp, create workspaces, apply APIResourceSchema + APIExport"
+    cmds: [ bash hack/kcp-setup.sh ]
+
+  # owner script: hack/mongodb-operator-install.sh   (mongodb-expert)
+  mongodb-operator:install:
+    desc: "Install MongoDB Community Operator {{.MONGODB_OPERATOR_VERSION}} into kind"
+    cmds: [ bash hack/mongodb-operator-install.sh ]
+
+  # owner script: hack/syncher-kubeconfig.sh   (syncher-expert)
+  syncher:kubeconfig:
+    desc: "Build the kcp kubeconfig for the syncher and store it as a Secret"
+    cmds: [ bash hack/syncher-kubeconfig.sh ]
+
+  # owner script: hack/syncher-install.sh + config/syncher/*.yaml   (syncher-expert)
+  syncher:install:
+    desc: "Deploy the multiclusterruntime syncher into kind"
+    cmds: [ bash hack/syncher-install.sh ]
+
+  # owner script: hack/provider-bind.sh + config/kcp/apibinding.yaml   (kcp-expert)
+  provider:bind:
+    desc: "Create the APIBinding in the consumer workspace; assert MongoDB API is served"
+    cmds: [ bash hack/provider-bind.sh ]
+
+  # owner script: hack/order.sh + config/samples/mongodb.yaml   (mongodb-expert)
+  order:
+    desc: "Order a MongoDB: create MongoDBCommunity {{.ORDER_NAME}} in the consumer workspace"
+    cmds: [ bash hack/order.sh ]
+
+  # owner script: test/e2e.sh   (test-verifier)
+  verify:
+    desc: "End-to-end proof: MongoDB Running in kind, status synced to kcp"
+    cmds: [ bash test/e2e.sh ]
+
+  # Convenience: show live state without touching anything (safe to run any time).
+  status:
+    desc: "Show live state: kind cluster, kcp, MongoDB operator, syncher"
+    cmds:
+      - |
+        echo "=== kind cluster (${KIND_CLUSTER}) ==="
+        if kind get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER}"; then
+          kubectl --kubeconfig "${KIND_KUBECONFIG}" get nodes 2>/dev/null
+        else
+          echo "  (not running)"
+        fi
+        echo ""
+        echo "=== kcp (in-cluster) ==="
+        kubectl --kubeconfig "${KIND_KUBECONFIG}" -n kcp get pods 2>/dev/null || echo "  (not installed)"
+        echo ""
+        echo "=== MongoDB Operator ==="
+        kubectl --kubeconfig "${KIND_KUBECONFIG}" -n mongodb get deploy 2>/dev/null || echo "  (not installed)"
+        echo ""
+        echo "=== multiclusterruntime syncher ==="
+        kubectl --kubeconfig "${KIND_KUBECONFIG}" -n mongodb get deploy example-mongodb-mcr-controller 2>/dev/null || echo "  (not installed)"
+
+  up:
+    desc: "Stand up the whole stack (integration runner only)"
+    # Ordered: tools → kind (with kcp) → kcp setup → mongodb operator → bind → syncher (kubeconfig + deploy)
+    # The VirtualWorkspace URL only appears AFTER an APIBinding exists, hence bind before syncher:kubeconfig.
+    # Each step is idempotent; re-running 'task up' after a partial failure is safe.
+    cmds:
+      - task: tools:check
+      - task: kind:up
+      - task: kcp:setup
+      - task: mongodb-operator:install
+      - task: provider:bind
+      - task: syncher:kubeconfig
+      - task: syncher:install
+
+  down:
+    desc: "Tear everything down (integration runner only)"
+    cmds:
+      - task: kind:down

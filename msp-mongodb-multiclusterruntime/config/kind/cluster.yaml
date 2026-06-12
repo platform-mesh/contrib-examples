@@ -1,0 +1,13 @@
+# kind cluster config for the msp-mongodb example.
+#
+# This example runs kcp INSIDE the kind cluster. Port 31443 is mapped to host port 8443
+# so kcp is accessible at https://kcp.localhost:8443 (*.localhost resolves to 127.0.0.1 per RFC 6761).
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: msp-mongodb
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 31443
+        hostPort: 8443
+        protocol: TCP

@@ -1,0 +1,82 @@
+# multiclusterruntime syncher deployment — owner: syncher-expert
+# Deploys the MongoDB syncher into the kind cluster.
+#
+# The IMAGE_PLACEHOLDER is replaced by hack/syncher-install.sh with the actual image.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: example-mongodb-mcr-controller
+  namespace: mongodb
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: example-mongodb-mcr-controller-role
+rules:
+  - apiGroups: ["mongodbcommunity.mongodb.com"]
+    resources: ["mongodbcommunity"]
+    verbs: ["*"]
+  - apiGroups: ["mongodbcommunity.mongodb.com"]
+    resources: ["mongodbcommunity/status"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: example-mongodb-mcr-controller-binding
+subjects:
+  - kind: ServiceAccount
+    name: example-mongodb-mcr-controller
+    namespace: mongodb
+roleRef:
+  kind: ClusterRole
+  name: example-mongodb-mcr-controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-mongodb-mcr-controller
+  namespace: mongodb
+  labels:
+    app: example-mongodb-mcr-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example-mongodb-mcr-controller
+  template:
+    metadata:
+      labels:
+        app: example-mongodb-mcr-controller
+    spec:
+      # hostAliases required because kcp.localhost resolves to the in-cluster kcp service
+      hostAliases:
+        - hostnames:
+            - kcp.localhost
+          ip: 10.96.0.100
+      serviceAccountName: example-mongodb-mcr-controller
+      containers:
+        - name: example-mongodb-mcr-controller
+          image: IMAGE_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--kcp-kubeconfig=/etc/kcp/kubeconfig"
+          volumeMounts:
+            - name: kcp-kubeconfig
+              mountPath: /etc/kcp
+              readOnly: true
+          resources:
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+      volumes:
+        - name: kcp-kubeconfig
+          secret:
+            secretName: kcp-kubeconfig
+            items:
+              - key: kubeconfig
+                path: kubeconfig
