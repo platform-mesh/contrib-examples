@@ -22,6 +22,7 @@ Each example lives in its own top-level `msp-<service>/` directory and is fully 
 |---------|---------------|---------------|
 | [`msp-postgres-kcp-only/`](msp-postgres-kcp-only/) | PostgreSQL as an orderable service via CloudNativePG — passthrough of the native `Cluster` API, with status + connection `Secret` synced back to the consumer | Standalone: kcp as a local host process + a kind cluster for the data plane |
 | [`msp-postgres-localsetup/`](msp-postgres-localsetup/) | Same Postgres-as-a-service loop, pinned to PostgreSQL 15, but wired into an existing Platform Mesh deployment — agent + CNPG run in a *second* kind cluster | Platform Mesh [`local-setup`](https://github.com/platform-mesh/local-setup) (kcp + portal + Keycloak) |
+| [`msp-cert-manager/`](msp-cert-manager/) | TLS certificate issuance as an orderable service via cert-manager + kro — consumer orders a `certmanager.ca/Certificate{fqdn}`, kro translates it to a real `cert-manager.io/Certificate`, and the TLS `Secret` syncs back; no resource-broker required | Standalone: kcp as a local host process + a kind cluster for the data plane |
 
 Each example's README has its own quickstart, architecture diagram (`docs/architecture.md`),
 per-target reference, and troubleshooting section.

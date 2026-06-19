@@ -1,0 +1,37 @@
+# Consumer-side APIBinding: binds the consumer workspace (root:msp:customer-a) to the provider's
+# api-syncagent APIExport so that certmanager.ca/v1alpha1/Certificate is served natively in the
+# consumer workspace.
+# Owner: kcp-expert. Applied by hack/provider-bind.sh in the consumer workspace.
+#
+# spec.reference.export.path MUST equal $PROVIDER_WS (root:msp:cert-manager-provider).
+# provider-bind.sh asserts this at apply time so a drift in the Taskfile var fails loudly.
+#
+# permissionClaims: api-syncagent v0.6.0 AUTO-ADDS three core (group "") permissionClaims to the
+# APIExport when a PublishedResource with a related Secret is created: namespaces, secrets, and
+# events — each with all: true. The consumer binding MUST Accept ALL THREE, or the APIBinding
+# never reaches phase Bound and the TLS Secret never syncs back (silent-failure trap).
+#   - namespaces: agent creates/uses the target namespace for synced objects.
+#   - secrets:    syncs the TLS Secret back as a related resource.
+#   - events:     syncs events for the published objects.
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: api-syncagent
+spec:
+  reference:
+    export:
+      path: root:msp:cert-manager-provider
+      name: api-syncagent
+  permissionClaims:
+    - group: ""
+      resource: namespaces
+      all: true
+      state: Accepted
+    - group: ""
+      resource: secrets
+      all: true
+      state: Accepted
+    - group: ""
+      resource: events
+      all: true
+      state: Accepted

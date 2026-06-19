@@ -1,0 +1,14 @@
+# config/samples/order-certificate.yaml — owner: cert-manager-expert
+# Consumer-facing Certificate CR applied into the kcp consumer workspace.
+# api-syncagent syncs this to kind where kro translates it into a cert-manager Certificate,
+# cert-manager signs it, and the resulting TLS Secret is synced back to the consumer.
+#
+# The TLS Secret will appear in the consumer workspace with the same name as this Certificate
+# (`my-cert`), containing tls.crt, tls.key, and ca.crt signed for `my-app.example.com`.
+apiVersion: certmanager.ca/v1alpha1
+kind: Certificate
+metadata:
+  name: my-cert
+  namespace: default
+spec:
+  fqdn: my-app.example.com
