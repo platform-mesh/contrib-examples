@@ -1,0 +1,11 @@
+# Self-signed ClusterIssuer used by cert-manager to sign all certificates in this example.
+# Owner: cert-manager-expert. Applied on the kind cluster by hack/certmanager-install.sh.
+#
+# Self-signed is sufficient for a local demo — no CA infrastructure required.
+# For production, replace with a CA-backed or ACME issuer.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-cert-manager-issuer
+spec:
+  selfSigned: {}

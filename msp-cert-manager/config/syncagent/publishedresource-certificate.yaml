@@ -1,0 +1,40 @@
+# config/syncagent/publishedresource-certificate.yaml — owner: syncagent-expert
+# Applied on the KIND cluster (CRD installed by the api-syncagent Helm chart). It tells the agent
+# to publish the kro-generated `certmanager.ca/v1alpha1/Certificate` CRD into kcp — the agent
+# generates an APIResourceSchema from the CRD and adds it to the APIExport `api-syncagent` in the
+# provider workspace — and to sync the resulting TLS Secret back to the consumer workspace.
+#
+# GOAL-1 SINGLE-CONSUMER SIMPLIFICATION (naming block):
+# Preserves consumer names on kind (e.g. Certificate `my-cert` stays `my-cert` in ns `default`).
+# MUST be removed for multi-consumer goal 2 to restore the agent's anti-collision name hashing.
+#
+# Related TLS Secret:
+# kro sets `cert-manager.io/Certificate.spec.secretName = <Certificate object name>` (see rgd.yaml).
+# cert-manager therefore creates a Secret with the same name as the Certificate. The template
+# `{{ .Object.metadata.name }}` evaluates to the Certificate name on each side of the sync,
+# making it correct both on kind (service) and in the consumer workspace (destination).
+apiVersion: syncagent.kcp.io/v1alpha1
+kind: PublishedResource
+metadata:
+  name: cert-manager-certificates
+spec:
+  resource:
+    kind: Certificate
+    apiGroup: certmanager.ca
+    versions:
+      - v1alpha1
+
+  # !! GOAL-1 SINGLE-CONSUMER SIMPLIFICATION — MUST BE REMOVED FOR GOAL 2 !!
+  naming:
+    name: "{{ .Object.metadata.name }}"
+    namespace: "{{ .Object.metadata.namespace }}"
+
+  related:
+    - identifier: tls-secret
+      origin: service
+      group: ""
+      version: v1
+      resource: secrets
+      object:
+        template:
+          template: "{{ .Object.metadata.name }}"
