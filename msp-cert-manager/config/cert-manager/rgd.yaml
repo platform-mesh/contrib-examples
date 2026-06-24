@@ -1,0 +1,47 @@
+# KRO ResourceGraphDefinition — owner: cert-manager-expert
+# Applied on the kind cluster by hack/certmanager-install.sh.
+#
+# This RGD does two things:
+#   1. Registers the `certmanager.ca/v1alpha1/Certificate` CRD — this is the "product API" that
+#      consumers order (via api-syncagent). It accepts just `spec.fqdn`.
+#   2. Translates each `certmanager.ca/Certificate` into a real `cert-manager.io/Certificate`,
+#      generating a TLS Secret named after the Certificate object itself.
+#
+# The secretName equals the Certificate object's name so the related-resource sync in
+# config/syncagent/publishedresource-certificate.yaml can locate it with a simple name template.
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: certificates.certmanager.ca
+spec:
+
+  schema:
+    group: certmanager.ca
+    apiVersion: v1alpha1
+    kind: Certificate
+    spec:
+      fqdn: string
+    status:
+      conditions: ${certificate.status.conditions}
+
+  resources:
+
+    - id: certificate
+      template:
+        apiVersion: cert-manager.io/v1
+        kind: Certificate
+        metadata:
+          name: ${schema.metadata.name}
+          namespace: ${schema.metadata.namespace}
+        spec:
+          commonName: ${schema.spec.fqdn}
+          dnsNames:
+            - ${schema.spec.fqdn}
+          secretName: ${schema.metadata.name}
+          privateKey:
+            algorithm: ECDSA
+            size: 256
+          issuerRef:
+            name: selfsigned-cert-manager-issuer
+            kind: ClusterIssuer
+            group: cert-manager.io

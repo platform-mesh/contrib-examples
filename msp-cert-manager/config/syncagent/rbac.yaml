@@ -1,0 +1,36 @@
+# config/syncagent/rbac.yaml — owner: syncagent-expert
+# Applied on the KIND cluster. Grants the api-syncagent ServiceAccount the permissions it needs to
+# reconcile the published certmanager.ca/Certificate and the related TLS Secret on the service cluster.
+#
+# ServiceAccount: kcp-api-syncagent / namespace kcp-system  (created by the Helm chart; the
+# release name `kcp-api-syncagent` equals the chart fullname, so SA name == release name).
+#
+# The chart's own ClusterRole already covers namespaces, CRD reads (builds the APIResourceSchema),
+# publishedresources, and secrets with get/list/watch/create/update. This role adds what is
+# specific to THIS published API:
+#   * certmanager.ca/Certificate (the kro-generated CRD) — get/list/watch/create/update/patch/delete
+#   * core secrets — full verbs so the TLS Secret can be fully reconciled as a related resource
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kcp-api-syncagent:cert-manager-certificates
+rules:
+  - apiGroups: ["certmanager.ca"]
+    resources: ["certificates", "certificates/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kcp-api-syncagent:cert-manager-certificates
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kcp-api-syncagent:cert-manager-certificates
+subjects:
+  - kind: ServiceAccount
+    name: kcp-api-syncagent
+    namespace: kcp-system
