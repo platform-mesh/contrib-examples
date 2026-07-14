@@ -1,0 +1,10 @@
+# config/samples/order-httpbin.yaml — owner: httpbin-expert
+# Consumer-facing HttpBin CR applied into the kcp consumer workspace.
+# api-syncagent syncs this to kind where the httpbin-operator provisions the Deployment + Service.
+apiVersion: orchestrate.platform-mesh.io/v1alpha1
+kind: HttpBin
+metadata:
+  name: httpbin-demo
+  namespace: default
+spec:
+  region: eu-west-1

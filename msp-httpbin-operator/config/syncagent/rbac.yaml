@@ -1,0 +1,33 @@
+# config/syncagent/rbac.yaml — owner: syncagent-expert
+# Applied on the KIND cluster. Grants the api-syncagent ServiceAccount the permissions it needs to
+# reconcile the PUBLISHED resource on the service cluster.
+#
+# ServiceAccount: kcp-api-syncagent / namespace kcp-system  (created by the Helm chart; the
+# release name `kcp-api-syncagent` equals the chart fullname, so SA name == release name).
+#
+# The chart's own ClusterRole (`kcp-api-syncagent:kcp-system`) already covers namespaces,
+# customresourcedefinitions (CRD read → builds the APIResourceSchema), publishedresources.
+# This role adds what is specific to THIS published API:
+#   * the HttpBin CR (httpbins + httpbins/status) — the agent creates/updates synced HttpBins
+#     and reads their status to sync it back to kcp.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kcp-api-syncagent:httpbins
+rules:
+  - apiGroups: ["orchestrate.platform-mesh.io"]
+    resources: ["httpbins", "httpbins/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kcp-api-syncagent:httpbins
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kcp-api-syncagent:httpbins
+subjects:
+  - kind: ServiceAccount
+    name: kcp-api-syncagent
+    namespace: kcp-system

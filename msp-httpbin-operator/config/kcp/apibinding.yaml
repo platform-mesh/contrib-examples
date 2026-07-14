@@ -1,0 +1,36 @@
+# Consumer-side APIBinding: binds the consumer workspace (root:msp:customer-a) to the provider's
+# api-syncagent APIExport so that httpbins.orchestrate.platform-mesh.io is served natively in the consumer ws.
+# Owner: kcp-expert. Applied by hack/provider-bind.sh in the consumer workspace.
+#
+# spec.reference.export.path MUST equal $PROVIDER_WS (root:msp:httpbin-provider). provider-bind.sh
+# asserts this at apply time so a drift in the Taskfile var fails loudly instead of silently
+# producing an unbindable APIBinding.
+#
+# permissionClaims: api-syncagent v0.6.0 AUTO-ADDS core (group "") permissionClaims to the
+# APIExport for this PublishedResource. The consumer binding MUST Accept ALL of them, or the
+# APIBinding never reaches phase Bound. Source-verified with syncagent-expert against v0.6.0.
+#   - namespaces: agent creates/uses the target namespace for synced objects.
+#   - events:     syncs events for the published objects.
+#
+# Field keys are kcp's APIBinding GroupResource shape: `group` (core = "") + `resource` (PLURAL
+# resource name). NB: api-syncagent's own docs write these as `resources:` — that key does NOT match
+# kcp's type; we use `resource:` (singular key) as validated by the kcp v0.31.2 APIBinding schema and
+# the onboarding demo-guide. Version apis.kcp.io/v1alpha1 (served by kcp v0.31.2).
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: api-syncagent
+spec:
+  reference:
+    export:
+      path: root:msp:httpbin-provider
+      name: api-syncagent
+  permissionClaims:
+    - group: ""
+      resource: namespaces
+      all: true
+      state: Accepted
+    - group: ""
+      resource: events
+      all: true
+      state: Accepted

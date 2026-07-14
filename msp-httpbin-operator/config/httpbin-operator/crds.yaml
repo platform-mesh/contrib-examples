@@ -1,0 +1,217 @@
+# HttpBin CRD — the API exposed to consumers via kcp.
+# Owner: httpbin-expert.
+#
+# This is a simplified version of the HttpBin CRD from the httpbin-operator.
+# The operator watches for HttpBin CRs and creates Deployment + Service for each.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: httpbins.orchestrate.platform-mesh.io
+spec:
+  group: orchestrate.platform-mesh.io
+  names:
+    kind: HttpBin
+    listKind: HttpBinList
+    plural: httpbins
+    singular: httpbin
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: HttpBin is the Schema for the httpbins API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HttpBinSpec defines the desired state of HttpBin
+            properties:
+              region:
+                description: Region can be used to filter which HttpBin should be served
+                type: string
+            type: object
+          status:
+            description: HttpBinStatus defines the observed state of HttpBin
+            properties:
+              conditions:
+                description: Conditions represent the latest available observations of an object's state
+                items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating details about the transition.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation that the condition was set based upon.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              ready:
+                description: Ready indicates if the underlying HttpBin deployment is ready
+                type: boolean
+              url:
+                description: URL is the URL for accessing the httpbin service
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+---
+# HttpBinDeployment CRD — internal resource used by the operator.
+# This is NOT exposed to consumers via kcp — it's the operator's internal implementation detail.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+  name: httpbindeployments.orchestrate.platform-mesh.io
+spec:
+  group: orchestrate.platform-mesh.io
+  names:
+    kind: HttpBinDeployment
+    listKind: HttpBinDeploymentList
+    plural: httpbindeployments
+    singular: httpbindeployment
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    additionalPrinterColumns:
+    - jsonPath: .status.readyReplicas
+      name: Ready
+      type: integer
+    - jsonPath: .spec.service.type
+      name: Service Type
+      type: string
+    - jsonPath: .spec.service.port
+      name: Port
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            properties:
+              deployment:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  replicas:
+                    type: integer
+                    default: 1
+                    minimum: 0
+                  labels:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+              service:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  port:
+                    type: integer
+                    default: 80
+                    minimum: 1
+                    maximum: 65535
+                  type:
+                    type: string
+                    enum: ["ClusterIP", "NodePort", "LoadBalancer"]
+                    default: ClusterIP
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+          status:
+            type: object
+            properties:
+              readyReplicas:
+                type: integer
+              isDeploymentReady:
+                type: boolean
+              url:
+                type: string
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      type: integer
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+    subresources:
+      status: {}
