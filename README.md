@@ -9,8 +9,8 @@
 
 A collection of runnable **example MSPs** (managed services) for [Platform Mesh](https://github.com/platform-mesh) on
 [kcp](https://kcp.io). Each example turns a piece of off-the-shelf infrastructure into a self-service,
-orderable API on a kcp control plane — using the [api-syncagent](https://github.com/kcp-dev/api-syncagent)
-to bridge a consumer's kcp workspace and the cluster where the operator actually runs.
+orderable API on a kcp control plane — using either the [api-syncagent](https://github.com/kcp-dev/api-syncagent)
+or a custom syncher to bridge a consumer's kcp workspace and the cluster where the operator actually runs.
 
 Each example lives in its own top-level `msp-<service>/` directory and is fully self-contained
 (its own `Taskfile.yml`, `hack/` scripts, `config/` manifests, `test/e2e.sh`, and `README.md`).
@@ -23,6 +23,7 @@ Each example lives in its own top-level `msp-<service>/` directory and is fully 
 | [`msp-postgres-kcp-only/`](msp-postgres-kcp-only/) | PostgreSQL as an orderable service via CloudNativePG — passthrough of the native `Cluster` API, with status + connection `Secret` synced back to the consumer | Standalone: kcp as a local host process + a kind cluster for the data plane |
 | [`msp-postgres-localsetup/`](msp-postgres-localsetup/) | Same Postgres-as-a-service loop, pinned to PostgreSQL 15, but wired into an existing Platform Mesh deployment — agent + CNPG run in a *second* kind cluster | Platform Mesh [`local-setup`](https://github.com/platform-mesh/local-setup) (kcp + portal + Keycloak) |
 | [`msp-cert-manager/`](msp-cert-manager/) | TLS certificate issuance as an orderable service via cert-manager + kro — consumer orders a `certmanager.ca/Certificate{fqdn}`, kro translates it to a real `cert-manager.io/Certificate`, and the TLS `Secret` syncs back; no resource-broker required | Standalone: kcp as a local host process + a kind cluster for the data plane |
+| [`msp-mongodb-multiclusterruntime/`](msp-mongodb-multiclusterruntime/) | MongoDB as an orderable service via a **custom syncher** built with [multiclusterruntime](https://github.com/kcp-dev/multiclusterruntime) — demonstrates building a CRD-specific sync solution when api-syncagent is not sufficient | Standalone: kcp running **inside** a kind cluster |
 
 Each example's README has its own quickstart, architecture diagram (`docs/architecture.md`),
 per-target reference, and troubleshooting section.

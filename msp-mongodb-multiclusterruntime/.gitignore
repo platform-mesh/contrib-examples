@@ -1,0 +1,7 @@
+.worktrees/
+
+# Runtime state — created by `task up` (not source).
+# `.kcp/`  : kcp kubeconfigs generated during setup.
+# `.kube/` : kind cluster's kubeconfig (`kind.kubeconfig`).
+.kcp/
+.kube/

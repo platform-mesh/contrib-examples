@@ -1,0 +1,29 @@
+# config/samples/mongodb.yaml — owner: mongodb-expert
+# Consumer-facing MongoDBCommunity CR applied into the kcp consumer workspace.
+# The multiclusterruntime syncher syncs this to kind where the MongoDB Operator provisions the database.
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: example-mongodb
+  namespace: mongodb
+spec:
+  # the operator only works with at least 2 replicas for whatever reason
+  members: 2
+  type: ReplicaSet
+  version: "6.0.5"
+  security:
+    authentication:
+      modes: ["SCRAM"]
+  users:
+    - name: my-user
+      db: admin
+      passwordSecretRef:
+        name: my-user-password
+      roles:
+        - name: clusterAdmin
+          db: admin
+        - name: userAdminAnyDatabase
+          db: admin
+      scramCredentialsSecretName: my-scram
+  additionalMongodConfig:
+    storage.wiredTiger.engineConfig.journalCompressor: zlib
