@@ -1,0 +1,11 @@
+# Consumer-side APIBinding: binds the consumer workspace to the provider's mongodb APIExport.
+# Owner: kcp-expert. Applied by hack/provider-bind.sh in the consumer workspace.
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIBinding
+metadata:
+  name: mongodb
+spec:
+  reference:
+    export:
+      path: root:mongodb
+      name: mongodb

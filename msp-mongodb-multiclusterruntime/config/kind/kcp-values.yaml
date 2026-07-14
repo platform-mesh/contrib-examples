@@ -1,0 +1,27 @@
+# Helm values for kcp running inside kind.
+# Used by hack/kind-up.sh when installing kcp via helm.
+externalHostname: "kcp.localhost"
+externalPort: "8443"
+etcd:
+  resources:
+    requests:
+      memory: 256Mi
+certificates:
+  dnsNames:
+    - localhost
+    - kcp.localhost
+kcp:
+  volumeClassName: "standard"
+  tokenAuth:
+    enabled: true
+  hostAliases:
+    enabled: true
+    values:
+      - ip: "10.96.0.100"
+        hostnames:
+          - "kcp.localhost"
+kcpFrontProxy:
+  service:
+    type: NodePort
+    nodePort: 31443
+    clusterIP: "10.96.0.100"
