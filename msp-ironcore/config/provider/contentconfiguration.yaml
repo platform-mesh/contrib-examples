@@ -62,16 +62,14 @@ spec:
                           "property": ["status.state"]
                         },
                         "ui": {
-                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
                           "listView": {
                             "resourceTitle": { "value": "Machines" },
                             "resourceDescription": { "value": "Virtual machine instances in your IronCore environment." },
                             "fields": [
                               { "label": "Name", "property": "metadata.name" },
                               { "label": "Namespace", "property": "metadata.namespace" },
-                              { "label": "State", "property": "status.state", "uiSettings": { "labelDisplay": true } },
-                              { "label": "Machine Class", "property": "spec.machineClassRef.name" },
-                              { "label": "Ignition Ref", "property": "spec.ignitionRef.name" },
+                              { "label": "State", "property": "status.state" },
                               { "label": "Created", "property": "metadata.creationTimestamp" }
                             ]
                           },
@@ -83,16 +81,16 @@ spec:
                               { "label": "Namespace", "property": "metadata.namespace" },
                               { "label": "UID", "property": "metadata.uid" },
                               { "label": "Created", "property": "metadata.creationTimestamp" },
-                              { "label": "State", "property": "status.state" },
-                              { "label": "Machine Class", "property": "spec.machineClassRef.name" },
-                              { "label": "Ignition Ref", "property": "spec.ignitionRef.name" }
+                              { "label": "Machine Class Ref", "property": "spec.machineClassRef.name" },
+                              { "label": "Ignition Ref", "property": "spec.ignitionRef.name" },
+                              { "label": "State", "property": "status.state" }
                             ]
                           },
                           "createView": {
                             "fields": [
                               { "label": "Name", "property": "metadata.name", "required": true },
                               { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] },
-                              { "label": "Machine Class", "property": "spec.machineClassRef.name", "required": true, "values": ["t3-small"] },
+                              { "label": "Machine Class Ref", "property": "spec.machineClassRef.name", "required": true, "values": ["t3-small"] },
                               { "label": "Ignition Ref", "property": "spec.ignitionRef.name", "required": false, "values": ["ignition"] }
                             ]
                           }
@@ -145,14 +143,14 @@ spec:
                           "property": ["status.state"]
                         },
                         "ui": {
-                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMD AgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSAxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
                           "listView": {
                             "resourceTitle": { "value": "Networks" },
                             "resourceDescription": { "value": "Virtual networks for overlay networking." },
                             "fields": [
                               { "label": "Name", "property": "metadata.name" },
                               { "label": "Namespace", "property": "metadata.namespace" },
-                              { "label": "State", "property": "status.state", "uiSettings": { "labelDisplay": true } },
+                              { "label": "State", "property": "status.state" },
                               { "label": "Created", "property": "metadata.creationTimestamp" }
                             ]
                           },
@@ -222,7 +220,7 @@ spec:
                           "property": ["status.ip"]
                         },
                         "ui": {
-                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMD AgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMD agMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
                           "listView": {
                             "resourceTitle": { "value": "Virtual IPs" },
                             "resourceDescription": { "value": "Virtual IP addresses for network access." },
@@ -230,8 +228,7 @@ spec:
                               { "label": "Name", "property": "metadata.name" },
                               { "label": "Namespace", "property": "metadata.namespace" },
                               { "label": "IP Family", "property": "spec.ipFamily" },
-                              { "label": "Type", "property": "spec.type" },
-                              { "label": "Allocated IP", "property": "status.ip", "uiSettings": { "withCopyButton": true } },
+                              { "label": "Allocated IP", "property": "status.ip" },
                               { "label": "Created", "property": "metadata.creationTimestamp" }
                             ]
                           },
@@ -244,7 +241,6 @@ spec:
                               { "label": "UID", "property": "metadata.uid" },
                               { "label": "Created", "property": "metadata.creationTimestamp" },
                               { "label": "IP Family", "property": "spec.ipFamily" },
-                              { "label": "Type", "property": "spec.type" },
                               { "label": "Allocated IP", "property": "status.ip" }
                             ]
                           },
@@ -305,16 +301,15 @@ spec:
                           "property": ["status.state"]
                         },
                         "ui": {
-                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMD agMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMTAgMjAwIj48Y2lyY2xlIGN4PSIxMDUiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTA1IiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjYwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+Tkk8L3RleHQ+PC9zdmc+",
                           "listView": {
                             "resourceTitle": { "value": "Network Interfaces" },
                             "resourceDescription": { "value": "Network interface connections for machines." },
                             "fields": [
                               { "label": "Name", "property": "metadata.name" },
                               { "label": "Namespace", "property": "metadata.namespace" },
-                              { "label": "State", "property": "status.state", "uiSettings": { "labelDisplay": true } },
+                              { "label": "State", "property": "status.state" },
                               { "label": "Network", "property": "spec.networkRef.name" },
-                              { "label": "IP Families", "property": "spec.ipFamilies" },
                               { "label": "Virtual IP", "property": "spec.virtualIP.virtualIPRef.name" },
                               { "label": "Created", "property": "metadata.creationTimestamp" }
                             ]
@@ -327,18 +322,16 @@ spec:
                               { "label": "Namespace", "property": "metadata.namespace" },
                               { "label": "UID", "property": "metadata.uid" },
                               { "label": "Created", "property": "metadata.creationTimestamp" },
-                              { "label": "State", "property": "status.state" },
-                              { "label": "Network", "property": "spec.networkRef.name" },
-                              { "label": "IP Families", "property": "spec.ipFamilies" },
-                              { "label": "Virtual IP", "property": "spec.virtualIP.virtualIPRef.name" }
+                              { "label": "Network Ref", "property": "spec.networkRef.name" },
+                              { "label": "Virtual IP Ref", "property": "spec.virtualIP.virtualIPRef.name" },
+                              { "label": "State", "property": "status.state" }
                             ]
                           },
                           "createView": {
                             "fields": [
                               { "label": "Name", "property": "metadata.name", "required": true },
                               { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] },
-                              { "label": "Network", "property": "spec.networkRef.name", "required": true },
-                              { "label": "IP Families", "property": "spec.ipFamilies", "required": true, "values": [["IPv4"]] }
+                              { "label": "Network Ref", "property": "spec.networkRef.name", "required": true }
                             ]
                           }
                         }
@@ -386,7 +379,7 @@ spec:
                         "scope": "Namespaced",
                         "namespace": null,
                         "ui": {
-                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMD AgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjNjQ3NDhCIi8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjUwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+8J+UkTwvdGV4dD48L3N2Zz4=",
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMD agMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjNjQ3NDhCIi8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjUwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+8J+UkTwvdGV4dD48L3N2Zz4=",
                           "listView": {
                             "resourceTitle": { "value": "Secrets" },
                             "resourceDescription": { "value": "Store sensitive data like ignition configs and credentials." },
@@ -405,7 +398,9 @@ spec:
                               { "label": "Namespace", "property": "metadata.namespace" },
                               { "label": "UID", "property": "metadata.uid" },
                               { "label": "Created", "property": "metadata.creationTimestamp" },
-                              { "label": "Type", "property": "type" }
+                              { "label": "Type", "property": "type" },
+                              { "label": "Immutable", "property": "immutable" },
+                              { "label": "Note", "value": "Secret data is not displayed for security reasons." }
                             ]
                           },
                           "createView": {
