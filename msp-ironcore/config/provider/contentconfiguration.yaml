@@ -1,0 +1,497 @@
+# config/provider/contentconfiguration.yaml — owner: portal-expert
+#
+# Adds IronCore resource entries to the account-scoped Platform Mesh portal nav for accounts that
+# have bound the `ironcore.dev` APIExport. Uses the `@platform-mesh/portal-ui-lib` generic web
+# components `generic-list-view` / `generic-detail-view` (no separate portal service needed).
+#
+# Reference: https://github.com/platform-mesh/portal-ui-lib/blob/main/docs/readme-generic-ui.md
+#
+# Five resource types are exposed under the IronCore parent menu:
+#   1. Machines        (compute.ironcore.dev/v1alpha1)
+#   2. Networks        (networking.ironcore.dev/v1alpha1)
+#   3. VirtualIPs      (networking.ironcore.dev/v1alpha1)
+#   4. NetworkInterfaces (networking.ironcore.dev/v1alpha1)
+#   5. Secrets         (v1 — core)
+#
+# `metadata.labels.ui.platform-mesh.io/content-for` MUST equal the APIExport name.
+apiVersion: ui.platform-mesh.io/v1alpha1
+kind: ContentConfiguration
+metadata:
+  name: ironcore-dev-ui
+  labels:
+    ui.platform-mesh.io/entity: core_platform-mesh_io_account
+    ui.platform-mesh.io/content-for: ironcore.dev
+spec:
+  inlineConfiguration:
+    contentType: json
+    content: |-
+      {
+        "name": "ironcore-resources",
+        "luigiConfigFragment": {
+          "data": {
+            "nodes": [
+              {
+                "pathSegment": "ironcore",
+                "navigationContext": "ironcore",
+                "label": "IronCore",
+                "icon": "laptop",
+                "order": 800,
+                "entityType": "main.core_platform-mesh_io_account",
+                "keepSelectedForChildren": true,
+                "children": [
+                  {
+                    "pathSegment": "machines",
+                    "navigationContext": "ironcore_machines",
+                    "label": "Machines",
+                    "icon": "it-host",
+                    "order": 810,
+                    "entityType": "main.core_platform-mesh_io_account",
+                    "keepSelectedForChildren": true,
+                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                    "webcomponent": { "selfRegistered": true },
+                    "context": {
+                      "resourceDefinition": {
+                        "apiGroup": "compute_ironcore_dev",
+                        "version": "v1alpha1",
+                        "entity": "Machine",
+                        "entityCollection": "Machines",
+                        "scope": "Namespaced",
+                        "namespace": null,
+                        "readyCondition": {
+                          "jsonPathExpression": "status.state",
+                          "property": ["status.state"]
+                        },
+                        "ui": {
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "listView": {
+                            "resourceTitle": { "value": "Machines" },
+                            "resourceDescription": { "value": "Virtual machine instances in your IronCore environment." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "State", "property": "status.state" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" }
+                            ]
+                          },
+                          "detailView": {
+                            "resourceTitle": { "property": "metadata.name" },
+                            "resourceDescription": { "value": "Virtual machine instance." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "UID", "property": "metadata.uid" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" },
+                              { "label": "Machine Class Ref", "property": "spec.machineClassRef.name" },
+                              { "label": "Ignition Ref", "property": "spec.ignitionRef.name" },
+                              { "label": "State", "property": "status.state" }
+                            ]
+                          },
+                          "createView": {
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name", "required": true },
+                              { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] },
+                              { "label": "Machine Class Ref", "property": "spec.machineClassRef.name", "required": true, "values": ["t3-small"] },
+                              { "label": "Ignition Ref", "property": "spec.ignitionRef.name", "required": false, "values": ["ignition"] }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "pathSegment": ":machineId",
+                        "hideFromNav": true,
+                        "keepSelectedForChildren": false,
+                        "defineEntity": {
+                          "id": "ironcore_machine",
+                          "contextKey": "machineId",
+                          "graphqlEntity": {
+                            "group": "compute_ironcore_dev",
+                            "version": "v1alpha1",
+                            "kind": "Machine",
+                            "query": "{ metadata { name namespace } }"
+                          }
+                        },
+                        "context": {
+                          "accountId": ":accountId",
+                          "machineId": ":machineId",
+                          "resourceId": ":machineId"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "pathSegment": "networks",
+                    "navigationContext": "ironcore_networks",
+                    "label": "Networks",
+                    "icon": "connected",
+                    "order": 820,
+                    "entityType": "main.core_platform-mesh_io_account",
+                    "keepSelectedForChildren": true,
+                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                    "webcomponent": { "selfRegistered": true },
+                    "context": {
+                      "resourceDefinition": {
+                        "apiGroup": "networking_ironcore_dev",
+                        "version": "v1alpha1",
+                        "entity": "Network",
+                        "entityCollection": "Networks",
+                        "scope": "Namespaced",
+                        "namespace": null,
+                        "readyCondition": {
+                          "jsonPathExpression": "status.state",
+                          "property": ["status.state"]
+                        },
+                        "ui": {
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "listView": {
+                            "resourceTitle": { "value": "Networks" },
+                            "resourceDescription": { "value": "Virtual networks for overlay networking." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "State", "property": "status.state" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" }
+                            ]
+                          },
+                          "detailView": {
+                            "resourceTitle": { "property": "metadata.name" },
+                            "resourceDescription": { "value": "Virtual network for overlay networking." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "UID", "property": "metadata.uid" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" },
+                              { "label": "State", "property": "status.state" }
+                            ]
+                          },
+                          "createView": {
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name", "required": true },
+                              { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "pathSegment": ":networkId",
+                        "hideFromNav": true,
+                        "keepSelectedForChildren": false,
+                        "defineEntity": {
+                          "id": "ironcore_network",
+                          "contextKey": "networkId",
+                          "graphqlEntity": {
+                            "group": "networking_ironcore_dev",
+                            "version": "v1alpha1",
+                            "kind": "Network",
+                            "query": "{ metadata { name namespace } }"
+                          }
+                        },
+                        "context": {
+                          "accountId": ":accountId",
+                          "networkId": ":networkId",
+                          "resourceId": ":networkId"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "pathSegment": "virtualips",
+                    "navigationContext": "ironcore_virtualips",
+                    "label": "Virtual IPs",
+                    "icon": "globe",
+                    "order": 830,
+                    "entityType": "main.core_platform-mesh_io_account",
+                    "keepSelectedForChildren": true,
+                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                    "webcomponent": { "selfRegistered": true },
+                    "context": {
+                      "resourceDefinition": {
+                        "apiGroup": "networking_ironcore_dev",
+                        "version": "v1alpha1",
+                        "entity": "VirtualIP",
+                        "entityCollection": "VirtualIPs",
+                        "scope": "Namespaced",
+                        "namespace": null,
+                        "readyCondition": {
+                          "jsonPathExpression": "status.ip",
+                          "property": ["status.ip"]
+                        },
+                        "ui": {
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmgiIHZpZXdCb3g9IjAgMCAyMD agMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjcwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+SUM8L3RleHQ+PC9zdmc+",
+                          "listView": {
+                            "resourceTitle": { "value": "Virtual IPs" },
+                            "resourceDescription": { "value": "Virtual IP addresses for network access." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "IP Family", "property": "spec.ipFamily" },
+                              { "label": "Allocated IP", "property": "status.ip" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" }
+                            ]
+                          },
+                          "detailView": {
+                            "resourceTitle": { "property": "metadata.name" },
+                            "resourceDescription": { "value": "Virtual IP address." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "UID", "property": "metadata.uid" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" },
+                              { "label": "IP Family", "property": "spec.ipFamily" },
+                              { "label": "Allocated IP", "property": "status.ip" }
+                            ]
+                          },
+                          "createView": {
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name", "required": true },
+                              { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] },
+                              { "label": "IP Family", "property": "spec.ipFamily", "required": true, "values": ["IPv4"] },
+                              { "label": "Type", "property": "spec.type", "required": true, "values": ["Public"] }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "pathSegment": ":virtualipId",
+                        "hideFromNav": true,
+                        "keepSelectedForChildren": false,
+                        "defineEntity": {
+                          "id": "ironcore_virtualip",
+                          "contextKey": "virtualipId",
+                          "graphqlEntity": {
+                            "group": "networking_ironcore_dev",
+                            "version": "v1alpha1",
+                            "kind": "VirtualIP",
+                            "query": "{ metadata { name namespace } }"
+                          }
+                        },
+                        "context": {
+                          "accountId": ":accountId",
+                          "virtualipId": ":virtualipId",
+                          "resourceId": ":virtualipId"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "pathSegment": "networkinterfaces",
+                    "navigationContext": "ironcore_networkinterfaces",
+                    "label": "Network Interfaces",
+                    "icon": "chain-link",
+                    "order": 840,
+                    "entityType": "main.core_platform-mesh_io_account",
+                    "keepSelectedForChildren": true,
+                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                    "webcomponent": { "selfRegistered": true },
+                    "context": {
+                      "resourceDefinition": {
+                        "apiGroup": "networking_ironcore_dev",
+                        "version": "v1alpha1",
+                        "entity": "NetworkInterface",
+                        "entityCollection": "NetworkInterfaces",
+                        "scope": "Namespaced",
+                        "namespace": null,
+                        "readyCondition": {
+                          "jsonPathExpression": "status.state",
+                          "property": ["status.state"]
+                        },
+                        "ui": {
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMTAgMjAwIj48Y2lyY2xlIGN4PSIxMDUiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjMEQ5NDg4Ii8+PHRleHQgeD0iMTA1IiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjYwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+Tkk8L3RleHQ+PC9zdmc+",
+                          "listView": {
+                            "resourceTitle": { "value": "Network Interfaces" },
+                            "resourceDescription": { "value": "Network interface connections for machines." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "State", "property": "status.state" },
+                              { "label": "Network", "property": "spec.networkRef.name" },
+                              { "label": "Virtual IP", "property": "spec.virtualIP.virtualIPRef.name" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" }
+                            ]
+                          },
+                          "detailView": {
+                            "resourceTitle": { "property": "metadata.name" },
+                            "resourceDescription": { "value": "Network interface configuration." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "UID", "property": "metadata.uid" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" },
+                              { "label": "Network Ref", "property": "spec.networkRef.name" },
+                              { "label": "Virtual IP Ref", "property": "spec.virtualIP.virtualIPRef.name" },
+                              { "label": "State", "property": "status.state" }
+                            ]
+                          },
+                          "createView": {
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name", "required": true },
+                              { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] },
+                              { "label": "Network Ref", "property": "spec.networkRef.name", "required": true }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "pathSegment": ":networkinterfaceId",
+                        "hideFromNav": true,
+                        "keepSelectedForChildren": false,
+                        "defineEntity": {
+                          "id": "ironcore_networkinterface",
+                          "contextKey": "networkinterfaceId",
+                          "graphqlEntity": {
+                            "group": "networking_ironcore_dev",
+                            "version": "v1alpha1",
+                            "kind": "NetworkInterface",
+                            "query": "{ metadata { name namespace } }"
+                          }
+                        },
+                        "context": {
+                          "accountId": ":accountId",
+                          "networkinterfaceId": ":networkinterfaceId",
+                          "resourceId": ":networkinterfaceId"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "pathSegment": "secrets",
+                    "navigationContext": "ironcore_secrets",
+                    "label": "Secrets",
+                    "icon": "locked",
+                    "order": 850,
+                    "entityType": "main.core_platform-mesh_io_account",
+                    "keepSelectedForChildren": true,
+                    "url": "/assets/platform-mesh-portal-ui-wc.js#generic-list-view",
+                    "webcomponent": { "selfRegistered": true },
+                    "context": {
+                      "resourceDefinition": {
+                        "apiGroup": "",
+                        "version": "v1",
+                        "entity": "Secret",
+                        "entityCollection": "Secrets",
+                        "scope": "Namespaced",
+                        "namespace": null,
+                        "ui": {
+                          "logoUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMD agMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjkwIiBmaWxsPSIjNjQ3NDhCIi8+PHRleHQgeD0iMTAwIiB5PSIxMjUiIGZvbnQtZmFtaWx5PSJBcmlhbCxzYW5zLXNlcmlmIiJmb250LXNpemU9IjUwIiJmb250LXdlaWdodD0iYm9sZCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiI+8J+UkTwvdGV4dD48L3N2Zz4=",
+                          "listView": {
+                            "resourceTitle": { "value": "Secrets" },
+                            "resourceDescription": { "value": "Store sensitive data like ignition configs and credentials." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "Type", "property": "type" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" }
+                            ]
+                          },
+                          "detailView": {
+                            "resourceTitle": { "property": "metadata.name" },
+                            "resourceDescription": { "value": "Secret with sensitive configuration data." },
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name" },
+                              { "label": "Namespace", "property": "metadata.namespace" },
+                              { "label": "UID", "property": "metadata.uid" },
+                              { "label": "Created", "property": "metadata.creationTimestamp" },
+                              { "label": "Type", "property": "type" },
+                              { "label": "Immutable", "property": "immutable" },
+                              { "label": "Note", "value": "Secret data is not displayed for security reasons." }
+                            ]
+                          },
+                          "createView": {
+                            "fields": [
+                              { "label": "Name", "property": "metadata.name", "required": true },
+                              { "label": "Namespace", "property": "metadata.namespace", "required": true, "values": ["default"] }
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "children": [
+                      {
+                        "pathSegment": ":secretId",
+                        "hideFromNav": true,
+                        "keepSelectedForChildren": false,
+                        "defineEntity": {
+                          "id": "ironcore_secret",
+                          "contextKey": "secretId",
+                          "graphqlEntity": {
+                            "group": "",
+                            "version": "v1",
+                            "kind": "Secret",
+                            "query": "{ metadata { name namespace } }"
+                          }
+                        },
+                        "context": {
+                          "accountId": ":accountId",
+                          "secretId": ":secretId",
+                          "resourceId": ":secretId"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.ironcore_machine",
+                "pathSegment": "machine_dashboard",
+                "label": "Dashboard",
+                "hideFromNav": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.ironcore_network",
+                "pathSegment": "network_dashboard",
+                "label": "Dashboard",
+                "hideFromNav": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.ironcore_virtualip",
+                "pathSegment": "virtualip_dashboard",
+                "label": "Dashboard",
+                "hideFromNav": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.ironcore_networkinterface",
+                "pathSegment": "networkinterface_dashboard",
+                "label": "Dashboard",
+                "hideFromNav": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
+              },
+              {
+                "entityType": "main.core_platform-mesh_io_account.ironcore_secret",
+                "pathSegment": "secret_dashboard",
+                "label": "Dashboard",
+                "hideFromNav": true,
+                "url": "/assets/platform-mesh-portal-ui-wc.js#generic-detail-view",
+                "webcomponent": { "selfRegistered": true },
+                "defineEntity": { "id": "dashboard" },
+                "compound": { "children": [] }
+              }
+            ],
+            "texts": [
+              { "locale": "",   "textDictionary": { "ironcore-resources": "IronCore" } },
+              { "locale": "en", "textDictionary": { "ironcore-resources": "IronCore" } }
+            ]
+          }
+        }
+      }
