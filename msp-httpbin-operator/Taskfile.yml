@@ -20,8 +20,8 @@ version: '3'
 vars:
   KCP_VERSION: v0.31.2
   SYNCAGENT_VERSION: "0.6.0"
-  HTTPBIN_OPERATOR_VERSION: "v0.6.2"
-  HTTPBIN_OPERATOR_IMAGE: "ghcr.io/platform-mesh/example-httpbin-operator:v0.6.2"
+  HTTPBIN_OPERATOR_VERSION: "v0.6.3"
+  HTTPBIN_OPERATOR_IMAGE: "ghcr.io/platform-mesh/example-httpbin-operator:v0.6.3"
   KIND_CLUSTER: msp-httpbin
   KIND_CONTEXT: kind-msp-httpbin
   PROVIDER_WS: 'root:msp:httpbin-provider'
