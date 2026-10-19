@@ -3,7 +3,7 @@
 This example turns **HttpBin into a self-service HTTP testing endpoint** on a [kcp](https://kcp.io) control plane.
 A consumer creates an `HttpBin` object in their own kcp workspace; the [kcp api-syncagent](https://github.com/kcp-dev/api-syncagent) syncs it to a backing **kind** cluster where the **httpbin-operator** provisions a Deployment + Service running the httpbin container. Status flows back to the consumer. See [`docs/architecture.md`](docs/architecture.md) for the full Mermaid flow diagram.
 
-**Matched stack:** kcp `v0.31.2` · api-syncagent `v0.6.0` · httpbin-operator `v0.6.2`
+**Matched stack:** kcp `v0.31.2` · api-syncagent `v0.6.0` · httpbin-operator `v0.6.3`
 
 ---
 
@@ -184,8 +184,8 @@ All `hack/` scripts receive the following env vars from `Taskfile.yml` — scrip
 | `KCP_BIN` | `bin/kcp` | Path to the pinned kcp binary |
 | `KCP_VERSION` | `v0.31.2` | Pinned kcp version |
 | `SYNCAGENT_VERSION` | `0.6.0` | Pinned api-syncagent version |
-| `HTTPBIN_OPERATOR_VERSION` | `v0.6.2` | Pinned httpbin-operator version |
-| `HTTPBIN_OPERATOR_IMAGE` | `ghcr.io/platform-mesh/example-httpbin-operator:v0.6.2` | Container image for the operator |
+| `HTTPBIN_OPERATOR_VERSION` | `v0.6.3` | Pinned httpbin-operator version |
+| `HTTPBIN_OPERATOR_IMAGE` | `ghcr.io/platform-mesh/example-httpbin-operator:v0.6.3` | Container image for the operator |
 | `KIND_CLUSTER` | `msp-httpbin` | kind cluster name |
 | `KIND_CONTEXT` | `kind-msp-httpbin` | kubectl context name for the kind cluster |
 | `PROVIDER_WS` | `root:msp:httpbin-provider` | kcp provider workspace |

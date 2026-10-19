@@ -17,9 +17,9 @@
 # We therefore DISCOVER the on-kind HttpBin (there is exactly one in this single-consumer demo)
 # and derive every other name from its real metadata.
 #
-# NOTE: The httpbin-operator creates Deployment/Service with prefix "httpbin-" (e.g.
-# httpbin-httpbin-demo for an HttpBin named httpbin-demo). We discover these by looking
-# for the HttpBinDeployment CR that the operator creates.
+# NOTE: The httpbin-operator names its Deployment/Service itself (since v0.6.3 they include the
+# consumer workspace, e.g. httpbin-<cluster>-<hash>) and copies the synced HttpBin's api-syncagent
+# labels onto them. We discover them by those labels instead of deriving the name.
 #
 # Several functions below are invoked indirectly (cleanup via `trap`; the *_present /
 # *_ready predicates via the `retry` helper's "$@"), which shellcheck cannot trace, so
@@ -129,10 +129,11 @@ else
   echo "    api-syncagent pods:"; kk -n kcp-system get pods 2>&1 | sed 's/^/    /' || true
 fi
 
-# The httpbin-operator creates resources with a "httpbin-" prefix.
-# Deployment name: httpbin-<httpbin-name>, Service name: httpbin-<httpbin-name>
-DEPLOY_NAME="httpbin-${KIND_HTTPBIN_NAME}"
-SVC_NAME="httpbin-${KIND_HTTPBIN_NAME}"
+# The operator's Deployment/Service carry the synced HttpBin's api-syncagent labels; the cluster
+# (consumer workspace) + name hash identify the resources that belong to THIS HttpBin.
+DEPLOY_NAME=""
+DEPLOY_NS=""
+SVC_NAME=""
 
 if [[ -n "$KIND_HTTPBIN_NAME" ]]; then
   # 2a — HttpBinDeployment exists and operator is reconciling.
@@ -145,28 +146,45 @@ if [[ -n "$KIND_HTTPBIN_NAME" ]]; then
     fail "HttpBinDeployment/$KIND_HTTPBIN_NAME NOT found — operator did not create it"
   fi
 
-  # 2b — Deployment is Ready.
+  # 2b — discover the operator's Deployment by label, then assert it is Ready.
+  COPY_CLUSTER="$(kk -n "$KIND_NS" get httpbin.orchestrate.platform-mesh.io "$KIND_HTTPBIN_NAME" -o jsonpath='{.metadata.labels.syncagent\.kcp\.io/remote-object-cluster}' 2>/dev/null || true)"
+  COPY_NAME_HASH="$(kk -n "$KIND_NS" get httpbin.orchestrate.platform-mesh.io "$KIND_HTTPBIN_NAME" -o jsonpath='{.metadata.labels.syncagent\.kcp\.io/remote-object-name-hash}' 2>/dev/null || true)"
+  OWNED_SELECTOR="app=httpbin,syncagent.kcp.io/remote-object-cluster=${COPY_CLUSTER},syncagent.kcp.io/remote-object-name-hash=${COPY_NAME_HASH}"
+  deploy_present() {
+    [[ -n "$(kk get deploy -A -l "$OWNED_SELECTOR" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)" ]]
+  }
+  if retry 60 3 deploy_present; then
+    read -r DEPLOY_NAME DEPLOY_NS <<<"$(kk get deploy -A -l "$OWNED_SELECTOR" -o jsonpath='{.items[0].metadata.name} {.items[0].metadata.namespace}' 2>/dev/null)"
+    SVC_NAME="$DEPLOY_NAME"  # the operator gives the Service the same name as the Deployment
+    pass "operator Deployment found via '$OWNED_SELECTOR': '$DEPLOY_NAME' (ns '$DEPLOY_NS')"
+  else
+    fail "no Deployment with labels '$OWNED_SELECTOR' — operator did not create it"
+    kk get deploy -A -l app=httpbin 2>&1 | sed 's/^/    /' || true
+  fi
+fi
+
+if [[ -n "$DEPLOY_NAME" ]]; then
   deploy_ready() {
     local ready
-    ready="$(kk -n "$KIND_NS" get deploy "$DEPLOY_NAME" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    ready="$(kk -n "$DEPLOY_NS" get deploy "$DEPLOY_NAME" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
     [[ "${ready:-0}" -ge 1 ]]
   }
   if retry 120 5 deploy_ready; then
-    REPLICAS="$(kk -n "$KIND_NS" get deploy "$DEPLOY_NAME" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
+    REPLICAS="$(kk -n "$DEPLOY_NS" get deploy "$DEPLOY_NAME" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)"
     pass "Deployment '$DEPLOY_NAME' is Ready (replicas=$REPLICAS)"
-    kk -n "$KIND_NS" get deploy "$DEPLOY_NAME" -o wide 2>&1 | sed 's/^/    /' || true
+    kk -n "$DEPLOY_NS" get deploy "$DEPLOY_NAME" -o wide 2>&1 | sed 's/^/    /' || true
   else
     fail "Deployment '$DEPLOY_NAME' not Ready in kind"
-    kk -n "$KIND_NS" get deploy 2>&1 | sed 's/^/    /' || true
+    kk -n "$DEPLOY_NS" get deploy 2>&1 | sed 's/^/    /' || true
   fi
 
   # 2c — the Service exists.
-  if kk -n "$KIND_NS" get svc "$SVC_NAME" >/dev/null 2>&1; then
-    pass "Service '$SVC_NAME' exists in kind (ns $KIND_NS)"
-    kk -n "$KIND_NS" get svc "$SVC_NAME" -o wide 2>&1 | sed 's/^/    /' || true
+  if kk -n "$DEPLOY_NS" get svc "$SVC_NAME" >/dev/null 2>&1; then
+    pass "Service '$SVC_NAME' exists in kind (ns $DEPLOY_NS)"
+    kk -n "$DEPLOY_NS" get svc "$SVC_NAME" -o wide 2>&1 | sed 's/^/    /' || true
   else
     fail "Service '$SVC_NAME' NOT found in kind"
-    kk -n "$KIND_NS" get svc 2>&1 | sed 's/^/    /' || true
+    kk -n "$DEPLOY_NS" get svc 2>&1 | sed 's/^/    /' || true
   fi
 fi
 
@@ -175,12 +193,12 @@ fi
 # ---------------------------------------------------------------------------
 section "3. Live HTTP request: curl httpbin service in kind"
 
-if [[ -n "${KIND_HTTPBIN_NAME:-}" ]] && [[ -n "${KIND_NS:-}" ]]; then
+if [[ -n "${SVC_NAME:-}" ]] && [[ -n "${DEPLOY_NS:-}" ]]; then
   # Port-forward and test
   PF_PORT=18080
 
   # Start port-forward in background
-  kk -n "$KIND_NS" port-forward "svc/$SVC_NAME" "${PF_PORT}:80" >/dev/null 2>&1 &
+  kk -n "$DEPLOY_NS" port-forward "svc/$SVC_NAME" "${PF_PORT}:80" >/dev/null 2>&1 &
   PF_PID=$!
   cleanup_pf() { kill "$PF_PID" 2>/dev/null || true; }
   trap cleanup_pf EXIT
@@ -211,7 +229,7 @@ if [[ -n "${KIND_HTTPBIN_NAME:-}" ]] && [[ -n "${KIND_NS:-}" ]]; then
   cleanup_pf
   trap - EXIT
 else
-  fail "cannot run live HTTP test — missing on-kind HttpBin (see checks above)"
+  fail "cannot run live HTTP test — missing on-kind HttpBin or operator Service (see checks above)"
 fi
 
 # ---------------------------------------------------------------------------
